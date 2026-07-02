@@ -26,19 +26,31 @@ func (d *RedisDriver) Install() error {
 	if d.Client == nil {
 		return fmt.Errorf("docker client is not available")
 	}
+	cfg, hostCfg, err := d.containerSpec()
+	if err != nil {
+		return err
+	}
+	_, err = d.Client.ContainerCreate(context.Background(), cfg, hostCfg, nil, nil, d.ContainerName)
+	return err
+}
+
+func (d *RedisDriver) containerSpec() (*container.Config, *container.HostConfig, error) {
 	port := nat.Port("6379/tcp")
 	cmd := []string{"redis-server", "--appendonly", "yes"}
 	if d.password != "" {
 		cmd = append(cmd, "--requirepass", d.password)
 	}
-	_, err := d.Client.ContainerCreate(context.Background(), &container.Config{
-		Image: d.Image,
-		Cmd:   cmd,
-	}, &container.HostConfig{
-		Binds: []string{d.DataDir + ":/data"},
-		PortBindings: nat.PortMap{
-			port: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "6379"}},
-		},
-	}, nil, nil, d.ContainerName)
-	return err
+	return &container.Config{
+			Image: d.Image,
+			Cmd:   cmd,
+		}, &container.HostConfig{
+			Binds: []string{d.DataDir + ":/data"},
+			PortBindings: nat.PortMap{
+				port: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "6379"}},
+			},
+		}, nil
+}
+
+func (d *RedisDriver) Upgrade(targetVersion string) error {
+	return d.recreateWithImage(targetVersion, d.containerSpec)
 }

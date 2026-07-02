@@ -26,15 +26,27 @@ func (d *MySQLDriver) Install() error {
 	if d.Client == nil {
 		return fmt.Errorf("docker client is not available")
 	}
-	port := nat.Port("3306/tcp")
-	_, err := d.Client.ContainerCreate(context.Background(), &container.Config{
-		Image: d.Image,
-		Env:   []string{"MYSQL_ROOT_PASSWORD=" + d.rootPassword},
-	}, &container.HostConfig{
-		Binds: []string{d.DataDir + ":/var/lib/mysql"},
-		PortBindings: nat.PortMap{
-			port: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "3306"}},
-		},
-	}, nil, nil, d.ContainerName)
+	cfg, hostCfg, err := d.containerSpec()
+	if err != nil {
+		return err
+	}
+	_, err = d.Client.ContainerCreate(context.Background(), cfg, hostCfg, nil, nil, d.ContainerName)
 	return err
+}
+
+func (d *MySQLDriver) containerSpec() (*container.Config, *container.HostConfig, error) {
+	port := nat.Port("3306/tcp")
+	return &container.Config{
+			Image: d.Image,
+			Env:   []string{"MYSQL_ROOT_PASSWORD=" + d.rootPassword},
+		}, &container.HostConfig{
+			Binds: []string{d.DataDir + ":/var/lib/mysql"},
+			PortBindings: nat.PortMap{
+				port: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "3306"}},
+			},
+		}, nil
+}
+
+func (d *MySQLDriver) Upgrade(targetVersion string) error {
+	return d.recreateWithImage(targetVersion, d.containerSpec)
 }

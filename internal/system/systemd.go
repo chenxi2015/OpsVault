@@ -14,6 +14,10 @@ func RestartService(name string) error {
 	return exec.Command("systemctl", "restart", name).Run()
 }
 
+func ReloadService(name string) error {
+	return exec.Command("systemctl", "reload", name).Run()
+}
+
 func EnableService(name string) error {
 	return exec.Command("systemctl", "enable", name).Run()
 }

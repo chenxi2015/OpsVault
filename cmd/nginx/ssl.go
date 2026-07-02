@@ -24,7 +24,11 @@ func (c *commandSet) newSSLApplyCommand() *cobra.Command {
 		Short: "Apply a Let's Encrypt certificate",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			root := filepath.Join(c.config.GetString("oneinstack.www_root"), domain)
-			return sslutil.Manager{SSLRoot: c.config.GetString("oneinstack.ssl_root")}.Apply(domain, root)
+			manager := sslutil.Manager{SSLRoot: c.config.GetString("oneinstack.ssl_root")}
+			if err := manager.Apply(domain, root); err != nil {
+				return err
+			}
+			return c.driver().EnableSSL(domain)
 		},
 	}
 	cmd.Flags().StringVar(&domain, "domain", "", "domain name")
@@ -51,7 +55,11 @@ func (c *commandSet) newSSLDeleteCommand() *cobra.Command {
 		Use:   "delete",
 		Short: "Delete SSL certificates",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return sslutil.Manager{SSLRoot: c.config.GetString("oneinstack.ssl_root")}.Delete(domain)
+			manager := sslutil.Manager{SSLRoot: c.config.GetString("oneinstack.ssl_root")}
+			if err := manager.Delete(domain); err != nil {
+				return err
+			}
+			return c.driver().DisableSSL(domain)
 		},
 	}
 	cmd.Flags().StringVar(&domain, "domain", "", "domain name")

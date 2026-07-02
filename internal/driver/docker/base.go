@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"OpsVault/internal/driver"
@@ -84,7 +85,7 @@ func (d *BaseDriver) Upgrade(targetVersion string) error {
 	if targetVersion == "" {
 		return fmt.Errorf("target version is required")
 	}
-	return nil
+	return fmt.Errorf("upgrade is not implemented for %s", d.Name)
 }
 
 func (d *BaseDriver) Status() (*driver.ServiceStatus, error) {
@@ -114,4 +115,38 @@ func (d *BaseDriver) Status() (*driver.ServiceStatus, error) {
 		status.Status = inspect.State.Status
 	}
 	return status, nil
+}
+
+func (d *BaseDriver) recreateWithImage(targetVersion string, specFn func() (*container.Config, *container.HostConfig, error)) error {
+	if d.Client == nil {
+		return fmt.Errorf("docker client is not available")
+	}
+	if targetVersion == "" {
+		return fmt.Errorf("target version is required")
+	}
+	d.Image = replaceImageTag(d.Image, targetVersion)
+	if err := d.EnsureReady(context.Background()); err != nil {
+		return err
+	}
+	timeout := 10
+	_ = d.Client.ContainerStop(context.Background(), d.ContainerName, container.StopOptions{Timeout: &timeout})
+	_ = d.Client.ContainerRemove(context.Background(), d.ContainerName, container.RemoveOptions{Force: true})
+	cfg, hostCfg, err := specFn()
+	if err != nil {
+		return err
+	}
+	resp, err := d.Client.ContainerCreate(context.Background(), cfg, hostCfg, nil, nil, d.ContainerName)
+	if err != nil {
+		return err
+	}
+	return d.Client.ContainerStart(context.Background(), resp.ID, container.StartOptions{})
+}
+
+func replaceImageTag(image, targetVersion string) string {
+	lastColon := strings.LastIndex(image, ":")
+	lastSlash := strings.LastIndex(image, "/")
+	if lastColon > lastSlash {
+		return image[:lastColon+1] + targetVersion
+	}
+	return image + ":" + targetVersion
 }

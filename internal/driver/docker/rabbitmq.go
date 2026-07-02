@@ -27,20 +27,32 @@ func (d *RabbitMQDriver) Install() error {
 	if d.Client == nil {
 		return fmt.Errorf("docker client is not available")
 	}
+	cfg, hostCfg, err := d.containerSpec()
+	if err != nil {
+		return err
+	}
+	_, err = d.Client.ContainerCreate(context.Background(), cfg, hostCfg, nil, nil, d.ContainerName)
+	return err
+}
+
+func (d *RabbitMQDriver) containerSpec() (*container.Config, *container.HostConfig, error) {
 	portAMQP := nat.Port("5672/tcp")
 	portUI := nat.Port("15672/tcp")
-	_, err := d.Client.ContainerCreate(context.Background(), &container.Config{
-		Image: d.Image,
-		Env: []string{
-			"RABBITMQ_DEFAULT_USER=" + d.user,
-			"RABBITMQ_DEFAULT_PASS=" + d.pass,
-		},
-	}, &container.HostConfig{
-		Binds: []string{d.DataDir + ":/var/lib/rabbitmq"},
-		PortBindings: nat.PortMap{
-			portAMQP: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "5672"}},
-			portUI:   []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "15672"}},
-		},
-	}, nil, nil, d.ContainerName)
-	return err
+	return &container.Config{
+			Image: d.Image,
+			Env: []string{
+				"RABBITMQ_DEFAULT_USER=" + d.user,
+				"RABBITMQ_DEFAULT_PASS=" + d.pass,
+			},
+		}, &container.HostConfig{
+			Binds: []string{d.DataDir + ":/var/lib/rabbitmq"},
+			PortBindings: nat.PortMap{
+				portAMQP: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "5672"}},
+				portUI:   []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "15672"}},
+			},
+		}, nil
+}
+
+func (d *RabbitMQDriver) Upgrade(targetVersion string) error {
+	return d.recreateWithImage(targetVersion, d.containerSpec)
 }
