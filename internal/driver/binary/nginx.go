@@ -51,6 +51,10 @@ func (d *NginxDriver) Restart() error {
 	return system.RestartService("nginx")
 }
 
+func (d *NginxDriver) Reload() error {
+	return reloadNginx()
+}
+
 func (d *NginxDriver) Uninstall(purgeData bool) error {
 	runner := oneinstack.NewRunner(d.Config)
 	if err := runner.UninstallNginx(); err != nil {

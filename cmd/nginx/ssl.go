@@ -42,7 +42,11 @@ func (c *commandSet) newSSLRenewCommand() *cobra.Command {
 		Use:   "renew",
 		Short: "Renew SSL certificates",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return sslutil.Manager{SSLRoot: c.config.GetString("oneinstack.ssl_root")}.Renew(domain)
+			manager := sslutil.Manager{SSLRoot: c.config.GetString("oneinstack.ssl_root")}
+			if err := manager.Renew(domain); err != nil {
+				return err
+			}
+			return c.driver().Reload()
 		},
 	}
 	cmd.Flags().StringVar(&domain, "domain", "", "domain name")

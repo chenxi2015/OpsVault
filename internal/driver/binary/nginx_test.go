@@ -56,6 +56,27 @@ func TestAddVHostCreatesRootAndConfig(t *testing.T) {
 	}
 }
 
+func TestReloadUsesReloadHook(t *testing.T) {
+	cfg := testNginxConfig(t)
+	drv := NewNginxDriver(cfg)
+	reloads := 0
+	oldReload := reloadNginx
+	reloadNginx = func() error {
+		reloads++
+		return nil
+	}
+	defer func() {
+		reloadNginx = oldReload
+	}()
+
+	if err := drv.Reload(); err != nil {
+		t.Fatalf("Reload: %v", err)
+	}
+	if reloads != 1 {
+		t.Fatalf("reloads = %d, want 1", reloads)
+	}
+}
+
 func TestEnableAndDisableSSLRewritesVHostConfig(t *testing.T) {
 	cfg := testNginxConfig(t)
 	drv := NewNginxDriver(cfg)

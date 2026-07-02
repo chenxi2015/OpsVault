@@ -133,8 +133,21 @@ func TestMySQLUpgradeRecreatesContainerWithNewTag(t *testing.T) {
 	if createImage != "mysql:8.4" {
 		t.Fatalf("create image = %q, want %q", createImage, "mysql:8.4")
 	}
-	if len(requests) != 4 {
+	if len(requests) != 6 {
 		t.Fatalf("requests = %#v", requests)
+	}
+	wantRequests := []string{
+		"GET /v1.47/networks",
+		"POST /v1.47/networks/create",
+		"POST /v1.47/containers/opsvault-mysql/stop",
+		"DELETE /v1.47/containers/opsvault-mysql",
+		"POST /v1.47/containers/create",
+		"POST /v1.47/containers/new-container-id/start",
+	}
+	for i := range wantRequests {
+		if requests[i] != wantRequests[i] {
+			t.Fatalf("requests[%d] = %q, want %q; all requests=%#v", i, requests[i], wantRequests[i], requests)
+		}
 	}
 }
 
