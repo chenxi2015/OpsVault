@@ -13,16 +13,96 @@ func testNginxConfig(t *testing.T) *viper.Viper {
 	t.Helper()
 	dir := t.TempDir()
 	cfg := viper.New()
-	cfg.Set("oneinstack.nginx_install_path", filepath.Join(dir, "nginx"))
-	cfg.Set("oneinstack.www_root", filepath.Join(dir, "wwwroot"))
-	cfg.Set("oneinstack.ssl_root", filepath.Join(dir, "ssl"))
+	cfg.Set("nginx.install_path", filepath.Join(dir, "nginx"))
+	cfg.Set("nginx.www_root", filepath.Join(dir, "wwwroot"))
+	cfg.Set("nginx.ssl_root", filepath.Join(dir, "ssl"))
+	cfg.Set("nginx.wwwlogs_root", filepath.Join(dir, "wwwlogs"))
+	cfg.Set("nginx.run_user", "www")
+	cfg.Set("nginx.run_group", "www")
 	return cfg
+}
+
+func TestNginxInstallPlanMatchesVendoredScriptFlow(t *testing.T) {
+	cfg := testNginxConfig(t)
+	cfg.Set("nginx.source_root", filepath.Join(t.TempDir(), "src"))
+	cfg.Set("nginx.version", "1.31.0")
+	cfg.Set("nginx.pcre_version", "8.45")
+	cfg.Set("nginx.openssl_version", "1.1.1w")
+
+	plan := newNginxInstallPlan(cfg)
+
+	if plan.installPath != cfg.GetString("nginx.install_path") {
+		t.Fatalf("installPath = %q, want config value", plan.installPath)
+	}
+	if plan.wwwRoot != cfg.GetString("nginx.www_root") {
+		t.Fatalf("wwwRoot = %q, want config value", plan.wwwRoot)
+	}
+	if plan.sslRoot != cfg.GetString("nginx.ssl_root") {
+		t.Fatalf("sslRoot = %q, want config value", plan.sslRoot)
+	}
+	if plan.wwwLogsRoot != cfg.GetString("nginx.wwwlogs_root") {
+		t.Fatalf("wwwLogsRoot = %q, want config value", plan.wwwLogsRoot)
+	}
+	if plan.nginxArchive() != "nginx-1.31.0.tar.gz" {
+		t.Fatalf("nginx archive = %q", plan.nginxArchive())
+	}
+	configure := strings.Join(plan.configureArgs(), " ")
+	for _, want := range []string{
+		"--prefix=" + cfg.GetString("nginx.install_path"),
+		"--user=www",
+		"--group=www",
+		"--with-http_ssl_module",
+		"--with-stream",
+		"--with-pcre=../pcre-8.45",
+		"--with-openssl=../openssl-1.1.1w",
+	} {
+		if !strings.Contains(configure, want) {
+			t.Fatalf("configure args missing %q: %s", want, configure)
+		}
+	}
+}
+
+func TestRenderNginxBaseConfigUsesConfiguredPaths(t *testing.T) {
+	cfg := testNginxConfig(t)
+	plan := newNginxInstallPlan(cfg)
+
+	conf := renderNginxBaseConfig(plan)
+
+	for _, want := range []string{
+		"user www www;",
+		"error_log " + cfg.GetString("nginx.wwwlogs_root") + "/error_nginx.log crit;",
+		"access_log " + cfg.GetString("nginx.wwwlogs_root") + "/access_nginx.log combined;",
+		"root " + cfg.GetString("nginx.www_root") + "/default;",
+		"include vhost/*.conf;",
+	} {
+		if !strings.Contains(conf, want) {
+			t.Fatalf("nginx.conf missing %q:\n%s", want, conf)
+		}
+	}
+}
+
+func TestRenderNginxSystemdServiceUsesConfiguredInstallPath(t *testing.T) {
+	cfg := testNginxConfig(t)
+	plan := newNginxInstallPlan(cfg)
+
+	unit := renderNginxSystemdService(plan)
+
+	for _, want := range []string{
+		"PIDFile=/var/run/nginx.pid",
+		"ExecStartPre=" + cfg.GetString("nginx.install_path") + "/sbin/nginx -t -c " + cfg.GetString("nginx.install_path") + "/conf/nginx.conf",
+		"ExecStart=" + cfg.GetString("nginx.install_path") + "/sbin/nginx -c " + cfg.GetString("nginx.install_path") + "/conf/nginx.conf",
+		"ExecReload=/bin/kill -s HUP $MAINPID",
+	} {
+		if !strings.Contains(unit, want) {
+			t.Fatalf("systemd unit missing %q:\n%s", want, unit)
+		}
+	}
 }
 
 func TestAddVHostCreatesRootAndConfig(t *testing.T) {
 	cfg := testNginxConfig(t)
 	drv := NewNginxDriver(cfg)
-	root := filepath.Join(cfg.GetString("oneinstack.www_root"), "example")
+	root := filepath.Join(cfg.GetString("nginx.www_root"), "example")
 	reloads := 0
 	oldReload := reloadNginx
 	reloadNginx = func() error {
@@ -37,7 +117,7 @@ func TestAddVHostCreatesRootAndConfig(t *testing.T) {
 		t.Fatalf("AddVHost: %v", err)
 	}
 
-	confPath := filepath.Join(cfg.GetString("oneinstack.nginx_install_path"), "conf", "vhost", "example.com.conf")
+	confPath := filepath.Join(cfg.GetString("nginx.install_path"), "conf", "vhost", "example.com.conf")
 	data, err := os.ReadFile(confPath)
 	if err != nil {
 		t.Fatalf("read conf: %v", err)
@@ -80,7 +160,7 @@ func TestReloadUsesReloadHook(t *testing.T) {
 func TestEnableAndDisableSSLRewritesVHostConfig(t *testing.T) {
 	cfg := testNginxConfig(t)
 	drv := NewNginxDriver(cfg)
-	root := filepath.Join(cfg.GetString("oneinstack.www_root"), "example")
+	root := filepath.Join(cfg.GetString("nginx.www_root"), "example")
 	reloads := 0
 	oldReload := reloadNginx
 	reloadNginx = func() error {
@@ -94,7 +174,7 @@ func TestEnableAndDisableSSLRewritesVHostConfig(t *testing.T) {
 	if err := drv.AddVHost("example.com", root); err != nil {
 		t.Fatalf("AddVHost: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(cfg.GetString("oneinstack.ssl_root"), "example.com"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(cfg.GetString("nginx.ssl_root"), "example.com"), 0o755); err != nil {
 		t.Fatalf("mkdir ssl dir: %v", err)
 	}
 
@@ -102,7 +182,7 @@ func TestEnableAndDisableSSLRewritesVHostConfig(t *testing.T) {
 		t.Fatalf("EnableSSL: %v", err)
 	}
 
-	confPath := filepath.Join(cfg.GetString("oneinstack.nginx_install_path"), "conf", "vhost", "example.com.conf")
+	confPath := filepath.Join(cfg.GetString("nginx.install_path"), "conf", "vhost", "example.com.conf")
 	sslConf, err := os.ReadFile(confPath)
 	if err != nil {
 		t.Fatalf("read ssl conf: %v", err)
@@ -114,7 +194,7 @@ func TestEnableAndDisableSSLRewritesVHostConfig(t *testing.T) {
 	if !strings.Contains(sslText, "return 301 https://$host$request_uri;") {
 		t.Fatalf("ssl conf missing redirect: %s", sslText)
 	}
-	if !strings.Contains(sslText, "ssl_certificate "+filepath.Join(cfg.GetString("oneinstack.ssl_root"), "example.com", "fullchain.pem")+";") {
+	if !strings.Contains(sslText, "ssl_certificate "+filepath.Join(cfg.GetString("nginx.ssl_root"), "example.com", "fullchain.pem")+";") {
 		t.Fatalf("ssl conf missing cert path: %s", sslText)
 	}
 	if reloads != 2 {

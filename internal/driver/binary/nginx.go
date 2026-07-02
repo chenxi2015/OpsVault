@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"OpsVault/internal/driver"
-	"OpsVault/internal/oneinstack"
 	"OpsVault/internal/system"
 	"OpsVault/pkg/fileutil"
 
@@ -29,11 +28,7 @@ func NewNginxDriver(cfg *viper.Viper) *NginxDriver {
 }
 
 func (d *NginxDriver) Install() error {
-	runner := oneinstack.NewRunner(d.Config)
-	if err := runner.InstallNginx(); err != nil {
-		return err
-	}
-	if err := system.EnableService("nginx"); err != nil {
+	if err := newNginxInstaller(d.Config).Install(); err != nil {
 		return err
 	}
 	return system.ApplyULimit()
@@ -56,27 +51,41 @@ func (d *NginxDriver) Reload() error {
 }
 
 func (d *NginxDriver) Uninstall(purgeData bool) error {
-	runner := oneinstack.NewRunner(d.Config)
-	if err := runner.UninstallNginx(); err != nil {
-		return err
+	_ = system.StopService("nginx")
+	_ = system.DisableService("nginx")
+	plan := newNginxInstallPlan(d.Config)
+	for _, path := range []string{plan.installPath, plan.systemdUnitPath, plan.logrotatePath} {
+		if err := fileutil.RemoveIfExists(path); err != nil {
+			return err
+		}
 	}
 	if purgeData {
-		if err := fileutil.RemoveIfExists(d.Config.GetString("oneinstack.www_root")); err != nil {
+		if err := fileutil.RemoveIfExists(nginxConfigString(d.Config, "nginx.www_root")); err != nil {
 			return err
 		}
-		if err := fileutil.RemoveIfExists(d.Config.GetString("oneinstack.ssl_root")); err != nil {
+		if err := fileutil.RemoveIfExists(nginxConfigString(d.Config, "nginx.ssl_root")); err != nil {
+			return err
+		}
+		if err := fileutil.RemoveIfExists(nginxConfigString(d.Config, "nginx.wwwlogs_root")); err != nil {
 			return err
 		}
 	}
-	return nil
+	return system.ReloadDaemon()
 }
 
 func (d *NginxDriver) Upgrade(targetVersion string) error {
-	return oneinstack.NewRunner(d.Config).UpgradeNginx(targetVersion)
+	if targetVersion == "" {
+		return fmt.Errorf("target version is required")
+	}
+	d.Config.Set("nginx.version", targetVersion)
+	if err := newNginxInstaller(d.Config).Install(); err != nil {
+		return err
+	}
+	return system.RestartService("nginx")
 }
 
 func (d *NginxDriver) Status() (*driver.ServiceStatus, error) {
-	installedPath := d.Config.GetString("oneinstack.nginx_install_path")
+	installedPath := nginxConfigString(d.Config, "nginx.install_path")
 	pid, _ := system.FindPID("nginx")
 	status := &driver.ServiceStatus{
 		Name:      "nginx",
@@ -87,8 +96,8 @@ func (d *NginxDriver) Status() (*driver.ServiceStatus, error) {
 		Ports:     []string{"80", "443"},
 		UpdatedAt: time.Now(),
 		Details: map[string]string{
-			"www_root": d.Config.GetString("oneinstack.www_root"),
-			"ssl_root": d.Config.GetString("oneinstack.ssl_root"),
+			"www_root": nginxConfigString(d.Config, "nginx.www_root"),
+			"ssl_root": nginxConfigString(d.Config, "nginx.ssl_root"),
 		},
 	}
 	if pid > 0 {
@@ -108,7 +117,7 @@ func (d *NginxDriver) AddVHost(domain, root string) error {
 	if err := fileutil.EnsureDir(root, 0o755); err != nil {
 		return err
 	}
-	confPath := filepath.Join(d.Config.GetString("oneinstack.nginx_install_path"), "conf", "vhost", domain+".conf")
+	confPath := filepath.Join(nginxConfigString(d.Config, "nginx.install_path"), "conf", "vhost", domain+".conf")
 	if err := fileutil.EnsureDir(filepath.Dir(confPath), 0o755); err != nil {
 		return err
 	}
@@ -123,12 +132,12 @@ func (d *NginxDriver) DeleteVHost(domain string, deleteRoot bool) error {
 	if domain == "" {
 		return fmt.Errorf("domain is required")
 	}
-	confPath := filepath.Join(d.Config.GetString("oneinstack.nginx_install_path"), "conf", "vhost", domain+".conf")
+	confPath := filepath.Join(nginxConfigString(d.Config, "nginx.install_path"), "conf", "vhost", domain+".conf")
 	if err := os.Remove(confPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	if deleteRoot {
-		root := filepath.Join(d.Config.GetString("oneinstack.www_root"), domain)
+		root := filepath.Join(nginxConfigString(d.Config, "nginx.www_root"), domain)
 		if err := fileutil.RemoveIfExists(root); err != nil {
 			return err
 		}
@@ -137,7 +146,7 @@ func (d *NginxDriver) DeleteVHost(domain string, deleteRoot bool) error {
 }
 
 func (d *NginxDriver) ListVHosts() ([]map[string]string, error) {
-	vhostDir := filepath.Join(d.Config.GetString("oneinstack.nginx_install_path"), "conf", "vhost")
+	vhostDir := filepath.Join(nginxConfigString(d.Config, "nginx.install_path"), "conf", "vhost")
 	entries, err := os.ReadDir(vhostDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -168,7 +177,7 @@ func (d *NginxDriver) EnableSSL(domain string) error {
 	if root == "" {
 		return fmt.Errorf("failed to extract root from %s", confPath)
 	}
-	certDir := filepath.Join(d.Config.GetString("oneinstack.ssl_root"), domain)
+	certDir := filepath.Join(nginxConfigString(d.Config, "nginx.ssl_root"), domain)
 	fullchain := filepath.Join(certDir, "fullchain.pem")
 	privkey := filepath.Join(certDir, "privkey.pem")
 	conf := renderSSLVHost(domain, root, fullchain, privkey)
@@ -195,7 +204,22 @@ func (d *NginxDriver) DisableSSL(domain string) error {
 }
 
 func (d *NginxDriver) vhostConfPath(domain string) string {
-	return filepath.Join(d.Config.GetString("oneinstack.nginx_install_path"), "conf", "vhost", domain+".conf")
+	return filepath.Join(nginxConfigString(d.Config, "nginx.install_path"), "conf", "vhost", domain+".conf")
+}
+
+func nginxConfigString(cfg *viper.Viper, key string) string {
+	switch key {
+	case "nginx.install_path":
+		return configString(cfg, key, "/usr/local/nginx")
+	case "nginx.www_root":
+		return configString(cfg, key, "/data/wwwroot")
+	case "nginx.ssl_root":
+		return configString(cfg, key, "/data/ssl")
+	case "nginx.wwwlogs_root":
+		return configString(cfg, key, "/data/wwwlogs")
+	default:
+		return configString(cfg, key, "")
+	}
 }
 
 func renderHTTPVHost(domain, root string) string {

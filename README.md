@@ -5,7 +5,7 @@ OpsVault 是一个面向 CentOS 7 / CentOS Stream 的运维工具箱，提供：
 - 基于 `cobra` + `viper` 的分层 CLI
 - 基于 `bubbletea` + `lipgloss` 的 TUI 入口
 - 基于 Docker SDK 的中间件驱动骨架
-- 基于 OneinStack 的 Nginx 二进制驱动骨架
+- 内建源码编译的 Nginx 二进制驱动骨架
 
 ## 当前已完成
 
@@ -20,7 +20,7 @@ OpsVault 是一个面向 CentOS 7 / CentOS Stream 的运维工具箱，提供：
 - 全局配置加载与默认配置模板
 - `driver.ServiceDriver` 统一接口与 `ServiceStatus` 状态结构
 - Docker 网络/基础驱动封装
-- Nginx OneinStack 下载与执行封装
+- Nginx 源码下载、编译安装、systemd 与基础配置生成
 - 基础 TUI 页面骨架
 - 核心单元测试与可编译构建
 
@@ -28,7 +28,7 @@ OpsVault 是一个面向 CentOS 7 / CentOS Stream 的运维工具箱，提供：
 
 默认配置文件位于：
 
-- [configs/default.yaml](/Users/kiwi/GolandProjects/OpsVault/configs/default.yaml)
+- [configs/default.yaml](./configs/default.yaml)
 
 可通过以下方式指定自定义配置：
 

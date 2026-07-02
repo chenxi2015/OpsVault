@@ -21,3 +21,11 @@ func ReloadService(name string) error {
 func EnableService(name string) error {
 	return exec.Command("systemctl", "enable", name).Run()
 }
+
+func DisableService(name string) error {
+	return exec.Command("systemctl", "disable", name).Run()
+}
+
+func ReloadDaemon() error {
+	return exec.Command("systemctl", "daemon-reload").Run()
+}

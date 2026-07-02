@@ -12,11 +12,19 @@ docker:
     cpu_max: "2"
     mem_max: "2g"
 
-oneinstack:
-  auto_script_url: "https://oneinstack.com/auto/"
-  nginx_install_path: "/usr/local/nginx"
+nginx:
+  install_path: "/usr/local/nginx"
   www_root: "/data/wwwroot"
   ssl_root: "/data/ssl"
+  wwwlogs_root: "/data/wwwlogs"
+  source_root: "/usr/local/src/opsvault-nginx"
+  version: "1.31.0"
+  pcre_version: "8.45"
+  openssl_version: "1.1.1w"
+  run_user: "www"
+  run_group: "www"
+  systemd_unit_path: "/lib/systemd/system/nginx.service"
+  logrotate_path: "/etc/logrotate.d/nginx"
 
 log:
   level: info

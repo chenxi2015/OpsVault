@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the first working OpsVault foundation with a complete Cobra command tree, driver abstractions, Docker and OneinStack integration scaffolding, and a minimal Bubble Tea TUI that compiles and is test-covered.
+**Goal:** Build the first working OpsVault foundation with a complete Cobra command tree, driver abstractions, Docker integration scaffolding, an in-project Nginx binary driver, and a minimal Bubble Tea TUI that compiles and is test-covered.
 
-**Architecture:** Commands stay thin and only translate flags into driver calls. Runtime behavior lives under `internal/driver`, `internal/oneinstack`, `internal/system`, and `pkg/*` helper packages. Docker lifecycle operations are centralized in `pkg/dockercli`, and TUI screens consume the same driver-facing service abstractions instead of duplicating deployment logic.
+**Architecture:** Commands stay thin and only translate flags into driver calls. Runtime behavior lives under `internal/driver`, `internal/system`, and `pkg/*` helper packages. Docker lifecycle operations are centralized in `pkg/dockercli`, and TUI screens consume the same driver-facing service abstractions instead of duplicating deployment logic.
 
 **Tech Stack:** Go, Cobra, Viper, Docker SDK, Bubble Tea, Bubbles, Lipgloss
 
@@ -14,10 +14,10 @@
 
 **Files:**
 - Create: `pkg/netutil/cidr_test.go`
-- Create: `internal/oneinstack/download_test.go`
+- Create: `internal/driver/binary/nginx_test.go`
 - Create: `cmd/root_test.go`
 
-- [ ] **Step 1: Write the failing tests for CIDR validation, OneinStack URL extraction, and root config bootstrap**
+- [ ] **Step 1: Write the failing tests for CIDR validation, Nginx install planning, and root config bootstrap**
 - [ ] **Step 2: Run `go test ./...` and confirm failures come from missing implementation**
 - [ ] **Step 3: Implement the minimal code required for the tests to pass**
 - [ ] **Step 4: Re-run `go test ./...` and keep the suite green**
@@ -41,8 +41,7 @@
 - Create: `internal/driver/docker/postgres.go`
 - Create: `internal/driver/binary/base.go`
 - Create: `internal/driver/binary/nginx.go`
-- Create: `internal/oneinstack/download.go`
-- Create: `internal/oneinstack/runner.go`
+- Create: `internal/driver/binary/nginx_installer.go`
 - Create: `internal/system/port.go`
 - Create: `internal/system/proc.go`
 - Create: `internal/system/sysctl.go`
@@ -51,7 +50,7 @@
 - [ ] **Step 1: Implement viper-backed root initialization and global flags**
 - [ ] **Step 2: Implement shared status types, service metadata, and driver constructors**
 - [ ] **Step 3: Implement Docker network helpers and lifecycle helpers via Docker SDK**
-- [ ] **Step 4: Implement Binary Nginx driver and OneinStack script wrappers**
+- [ ] **Step 4: Implement Binary Nginx driver and source installer**
 - [ ] **Step 5: Run focused tests, then `go test ./...`**
 
 ### Task 3: Build the Cobra command tree for all required services
