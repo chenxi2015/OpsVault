@@ -1,8 +1,7 @@
 package docker
 
 import (
-	"context"
-	"fmt"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -20,18 +19,7 @@ func NewMySQLDriver(cli DockerClient, cfg *viper.Viper, rootPassword string) *My
 }
 
 func (d *MySQLDriver) Install() error {
-	if err := d.EnsureReady(context.Background()); err != nil {
-		return err
-	}
-	if d.Client == nil {
-		return fmt.Errorf("docker client is not available")
-	}
-	cfg, hostCfg, err := d.containerSpec()
-	if err != nil {
-		return err
-	}
-	_, err = d.Client.ContainerCreate(context.Background(), cfg, hostCfg, nil, nil, d.ContainerName)
-	return err
+	return d.installWithSpec(d.containerSpec)
 }
 
 func (d *MySQLDriver) containerSpec() (*container.Config, *container.HostConfig, error) {
@@ -39,6 +27,13 @@ func (d *MySQLDriver) containerSpec() (*container.Config, *container.HostConfig,
 	return &container.Config{
 			Image: d.Image,
 			Env:   []string{"MYSQL_ROOT_PASSWORD=" + d.rootPassword},
+			Healthcheck: &container.HealthConfig{
+				Test:        []string{"CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -p$MYSQL_ROOT_PASSWORD || exit 1"},
+				Interval:    10 * time.Second,
+				Timeout:     5 * time.Second,
+				StartPeriod: 20 * time.Second,
+				Retries:     12,
+			},
 		}, &container.HostConfig{
 			Binds: []string{d.DataDir + ":/var/lib/mysql"},
 			PortBindings: nat.PortMap{

@@ -1,8 +1,7 @@
 package docker
 
 import (
-	"context"
-	"fmt"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -20,18 +19,7 @@ func NewPostgresDriver(cli DockerClient, cfg *viper.Viper, password string) *Pos
 }
 
 func (d *PostgresDriver) Install() error {
-	if err := d.EnsureReady(context.Background()); err != nil {
-		return err
-	}
-	if d.Client == nil {
-		return fmt.Errorf("docker client is not available")
-	}
-	cfg, hostCfg, err := d.containerSpec()
-	if err != nil {
-		return err
-	}
-	_, err = d.Client.ContainerCreate(context.Background(), cfg, hostCfg, nil, nil, d.ContainerName)
-	return err
+	return d.installWithSpec(d.containerSpec)
 }
 
 func (d *PostgresDriver) containerSpec() (*container.Config, *container.HostConfig, error) {
@@ -39,6 +27,13 @@ func (d *PostgresDriver) containerSpec() (*container.Config, *container.HostConf
 	return &container.Config{
 			Image: d.Image,
 			Env:   []string{"POSTGRES_PASSWORD=" + d.password},
+			Healthcheck: &container.HealthConfig{
+				Test:        []string{"CMD-SHELL", "pg_isready -U postgres"},
+				Interval:    10 * time.Second,
+				Timeout:     5 * time.Second,
+				StartPeriod: 15 * time.Second,
+				Retries:     10,
+			},
 		}, &container.HostConfig{
 			Binds: []string{d.DataDir + ":/var/lib/postgresql/data"},
 			PortBindings: nat.PortMap{

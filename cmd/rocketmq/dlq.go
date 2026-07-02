@@ -1,6 +1,10 @@
 package rocketmq
 
-import "github.com/spf13/cobra"
+import (
+	"sort"
+
+	"github.com/spf13/cobra"
+)
 
 func (c *commandSet) newDLQCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "dlq", Short: "Dead-letter queue tools"}
@@ -12,7 +16,17 @@ func (c *commandSet) newDLQCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			for key, value := range drv.DLQStat() {
+			stats, err := drv.DLQStat()
+			if err != nil {
+				return err
+			}
+			keys := make([]string, 0, len(stats))
+			for key := range stats {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			for _, key := range keys {
+				value := stats[key]
 				cmd.Printf("%s: %s\n", key, value)
 			}
 			return nil

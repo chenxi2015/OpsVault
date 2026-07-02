@@ -1,8 +1,7 @@
 package docker
 
 import (
-	"context"
-	"fmt"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -21,18 +20,7 @@ func NewRabbitMQDriver(cli DockerClient, cfg *viper.Viper, user, pass string) *R
 }
 
 func (d *RabbitMQDriver) Install() error {
-	if err := d.EnsureReady(context.Background()); err != nil {
-		return err
-	}
-	if d.Client == nil {
-		return fmt.Errorf("docker client is not available")
-	}
-	cfg, hostCfg, err := d.containerSpec()
-	if err != nil {
-		return err
-	}
-	_, err = d.Client.ContainerCreate(context.Background(), cfg, hostCfg, nil, nil, d.ContainerName)
-	return err
+	return d.installWithSpec(d.containerSpec)
 }
 
 func (d *RabbitMQDriver) containerSpec() (*container.Config, *container.HostConfig, error) {
@@ -43,6 +31,13 @@ func (d *RabbitMQDriver) containerSpec() (*container.Config, *container.HostConf
 			Env: []string{
 				"RABBITMQ_DEFAULT_USER=" + d.user,
 				"RABBITMQ_DEFAULT_PASS=" + d.pass,
+			},
+			Healthcheck: &container.HealthConfig{
+				Test:        []string{"CMD-SHELL", "rabbitmq-diagnostics -q ping"},
+				Interval:    10 * time.Second,
+				Timeout:     5 * time.Second,
+				StartPeriod: 20 * time.Second,
+				Retries:     12,
 			},
 		}, &container.HostConfig{
 			Binds: []string{d.DataDir + ":/var/lib/rabbitmq"},

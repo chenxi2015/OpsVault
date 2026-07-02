@@ -1,8 +1,7 @@
 package docker
 
 import (
-	"context"
-	"fmt"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -20,18 +19,7 @@ func NewRedisDriver(cli DockerClient, cfg *viper.Viper, password string) *RedisD
 }
 
 func (d *RedisDriver) Install() error {
-	if err := d.EnsureReady(context.Background()); err != nil {
-		return err
-	}
-	if d.Client == nil {
-		return fmt.Errorf("docker client is not available")
-	}
-	cfg, hostCfg, err := d.containerSpec()
-	if err != nil {
-		return err
-	}
-	_, err = d.Client.ContainerCreate(context.Background(), cfg, hostCfg, nil, nil, d.ContainerName)
-	return err
+	return d.installWithSpec(d.containerSpec)
 }
 
 func (d *RedisDriver) containerSpec() (*container.Config, *container.HostConfig, error) {
@@ -40,9 +28,21 @@ func (d *RedisDriver) containerSpec() (*container.Config, *container.HostConfig,
 	if d.password != "" {
 		cmd = append(cmd, "--requirepass", d.password)
 	}
+	healthCmd := `redis-cli ping | grep PONG`
+	if d.password != "" {
+		healthCmd = `redis-cli -a "$REDIS_PASSWORD" ping | grep PONG`
+	}
 	return &container.Config{
 			Image: d.Image,
 			Cmd:   cmd,
+			Env:   []string{"REDIS_PASSWORD=" + d.password},
+			Healthcheck: &container.HealthConfig{
+				Test:        []string{"CMD-SHELL", healthCmd},
+				Interval:    10 * time.Second,
+				Timeout:     5 * time.Second,
+				StartPeriod: 10 * time.Second,
+				Retries:     10,
+			},
 		}, &container.HostConfig{
 			Binds: []string{d.DataDir + ":/data"},
 			PortBindings: nat.PortMap{
