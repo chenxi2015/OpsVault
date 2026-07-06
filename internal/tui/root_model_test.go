@@ -77,3 +77,46 @@ func TestLoadStatusesReturnsRefreshMessage(t *testing.T) {
 		t.Fatalf("services len = %d, want 2", len(loaded.services))
 	}
 }
+
+type mockNginxDriver struct {
+	driver.ServiceDriver
+}
+
+func (mockNginxDriver) TailLogs(lines int) (string, error) {
+	return "mock logs", nil
+}
+
+func (mockNginxDriver) Reload() error {
+	return nil
+}
+
+func TestServiceRegistryAndActions(t *testing.T) {
+	// Assert presence of registry types and actions
+	ref := ServiceRef{
+		Name:   "nginx",
+		Driver: mockNginxDriver{},
+	}
+	if ref.Name != "nginx" {
+		t.Errorf("expected name nginx, got %s", ref.Name)
+	}
+
+	// Mock service status
+	status := driver.ServiceStatus{
+		Name:    "nginx",
+		Mode:    driver.ModeBinary,
+		Running: true,
+		Status:  "running",
+	}
+
+	actions := AvailableServiceActions(status, ref)
+	hasLogs := false
+	for _, a := range actions {
+		if a.ID == ActionLogs {
+			hasLogs = true
+		}
+	}
+	if !hasLogs {
+		t.Errorf("running Nginx service should have 'logs' action available")
+	}
+}
+

@@ -18,24 +18,24 @@ func NewRuntimeStatusProvider(cfg *viper.Viper, dockerFactory func() (*client.Cl
 	return RuntimeStatusProvider{config: cfg, dockerFactory: dockerFactory}
 }
 
+func (p RuntimeStatusProvider) Services() []ServiceRef {
+	cli, _ := p.dockerFactory() // Ignore error to let Nginx remain operational
+
+	return []ServiceRef{
+		{Name: "nginx", Driver: binary.NewNginxDriver(p.config)},
+		{Name: "mysql", Driver: dockdrv.NewMySQLDriver(dockdrv.WrapClient(cli), p.config, "")},
+		{Name: "redis", Driver: dockdrv.NewRedisDriver(dockdrv.WrapClient(cli), p.config, "")},
+		{Name: "rocketmq", Driver: dockdrv.NewRocketMQDriver(dockdrv.WrapClient(cli), p.config)},
+		{Name: "rabbitmq", Driver: dockdrv.NewRabbitMQDriver(dockdrv.WrapClient(cli), p.config, "", "")},
+		{Name: "postgres", Driver: dockdrv.NewPostgresDriver(dockdrv.WrapClient(cli), p.config, "")},
+	}
+}
+
 func (p RuntimeStatusProvider) Statuses() ([]driver.ServiceStatus, error) {
-	cli, err := p.dockerFactory()
-	if err != nil {
-		return nil, err
-	}
-
-	services := []driver.ServiceDriver{
-		binary.NewNginxDriver(p.config),
-		dockdrv.NewMySQLDriver(dockdrv.WrapClient(cli), p.config, ""),
-		dockdrv.NewRedisDriver(dockdrv.WrapClient(cli), p.config, ""),
-		dockdrv.NewRocketMQDriver(dockdrv.WrapClient(cli), p.config),
-		dockdrv.NewRabbitMQDriver(dockdrv.WrapClient(cli), p.config, "", ""),
-		dockdrv.NewPostgresDriver(dockdrv.WrapClient(cli), p.config, ""),
-	}
-
+	services := p.Services()
 	results := make([]driver.ServiceStatus, 0, len(services))
 	for _, service := range services {
-		status, err := service.Status()
+		status, err := service.Driver.Status()
 		if err != nil {
 			return nil, err
 		}
@@ -43,3 +43,4 @@ func (p RuntimeStatusProvider) Statuses() ([]driver.ServiceStatus, error) {
 	}
 	return results, nil
 }
+
