@@ -15,4 +15,3 @@ func (c *commandSet) newLogCommand() *cobra.Command {
 		},
 	}
 }
-

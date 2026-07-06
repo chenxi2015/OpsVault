@@ -453,4 +453,3 @@ func TestDockerLogReaderCapability(t *testing.T) {
 		t.Fatalf("MySQLDriver does not implement driver.LogReader")
 	}
 }
-

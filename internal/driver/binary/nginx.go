@@ -275,4 +275,3 @@ func (d *NginxDriver) DeleteSSL(domain string) error {
 	}
 	return d.DisableSSL(domain)
 }
-

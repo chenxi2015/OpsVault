@@ -43,4 +43,3 @@ func (p RuntimeStatusProvider) Statuses() ([]driver.ServiceStatus, error) {
 	}
 	return results, nil
 }
-

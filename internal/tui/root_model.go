@@ -75,9 +75,9 @@ type RootModel struct {
 	selectedServiceIndex int
 
 	// Nginx specific states
-	selectedNginxSubMode  int // 0: Service, 1: VHosts, 2: Certificates
-	selectedVHostIndex    int
-	selectedCertIndex     int
+	selectedNginxSubMode int // 0: Service, 1: VHosts, 2: Certificates
+	selectedVHostIndex   int
+	selectedCertIndex    int
 	nginxVHosts          []map[string]string
 
 	// Confirmation flow
@@ -338,7 +338,6 @@ func (m *RootModel) findRegistry(name string) *ServiceRef {
 	}
 	return nil
 }
-
 
 func (m *RootModel) cycleFocus() {
 	if m.drawerMode == drawerHidden {
@@ -605,7 +604,6 @@ func (m *RootModel) nginxView() string {
 	return NginxPanelView(*m)
 }
 
-
 func tickRefresh() tea.Cmd {
 	return tea.Tick(refreshInterval, func(time.Time) tea.Msg {
 		return refreshTickMsg{}
@@ -670,5 +668,3 @@ func (m *RootModel) moveSelection(dir int) {
 		}
 	}
 }
-
-

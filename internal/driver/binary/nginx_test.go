@@ -242,4 +242,3 @@ func TestNginxDriverCapabilities(t *testing.T) {
 		t.Errorf("NginxDriver does not implement driver.SSLManager")
 	}
 }
-

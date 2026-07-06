@@ -436,4 +436,3 @@ func (d *BaseDriver) TailLogs(lines int) (string, error) {
 	}
 	return stdout.String() + stderr.String(), nil
 }
-

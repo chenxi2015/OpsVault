@@ -53,4 +53,3 @@ type SSLManager interface {
 	RenewSSL(domain string) error
 	DeleteSSL(domain string) error
 }
-
