@@ -138,6 +138,10 @@ func DockerPanelView(m RootModel) string {
 			actionHints = append(actionHints, fmt.Sprintf("  [%s] %s", lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render(key), act.Label))
 		}
 	}
+	if selectedRef.Name == "rocketmq" && statusVal != "not installed" {
+		actionHints = append(actionHints, fmt.Sprintf("  [%s] Version Query", lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("v")))
+		actionHints = append(actionHints, fmt.Sprintf("  [%s] DLQ Stats", lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("q")))
+	}
 	if len(actions) == 0 {
 		actionHints = append(actionHints, "  (No actions available in current state)")
 	}

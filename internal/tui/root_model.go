@@ -270,7 +270,7 @@ func (m *RootModel) View() string {
 	case 2:
 		body = m.dockerView()
 	default:
-		body = ConfigWizardView()
+		body = ConfigWizardView(*m)
 	}
 
 	// Bottom task / log drawer
@@ -373,6 +373,14 @@ func (m *RootModel) handleInputSubmit() (tea.Model, tea.Cmd) {
 	val := m.textInputValue
 	m.textInputValue = ""
 
+	if strings.HasPrefix(m.textInputState, "config|") {
+		configKey := strings.TrimPrefix(m.textInputState, "config|")
+		if m.config != nil {
+			m.config.Set(configKey, val)
+		}
+		return m, nil
+	}
+
 	switch m.textInputState {
 	case "vhost_domain":
 		if val == "" {
@@ -422,6 +430,38 @@ func (m *RootModel) handleInputSubmit() (tea.Model, tea.Cmd) {
 }
 
 func (m *RootModel) handleShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.active == 3 {
+		if msg.String() == "enter" && m.selectedServiceIndex < len(ConfigKeys) {
+			configKey := ConfigKeys[m.selectedServiceIndex]
+			m.editing = true
+			m.textInputPrompt = fmt.Sprintf("Enter new value for %s:", configKey)
+			m.textInputState = "config|" + configKey
+			m.textInputValue = m.config.GetString(configKey)
+			return m, nil
+		}
+		if msg.String() == "s" {
+			m.drawerMode = drawerTasks
+			m.drawerContent = "Saving configurations to configs/default.yaml..."
+			return m, func() tea.Msg {
+				var err error
+				if m.config != nil {
+					err = m.config.WriteConfig()
+				}
+				output := "Configuration successfully saved."
+				if err != nil {
+					output = fmt.Sprintf("Error saving configuration: %v", err)
+				}
+				return taskFinishedMsg{
+					ServiceName: "config",
+					ActionName:  "save",
+					Output:      output,
+					Err:         err,
+				}
+			}
+		}
+		return m, nil
+	}
+
 	var selectedSvc ServiceRef
 	var hasSvc bool
 
@@ -527,6 +567,18 @@ func (m *RootModel) handleShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		actionID = ActionLogs
 	case "d":
 		actionID = ActionUninstall
+	case "v":
+		if selectedSvc.Name == "rocketmq" {
+			m.drawerMode = drawerTasks
+			m.drawerContent = "Querying RocketMQ broker version..."
+			return m, runAction(m.config, m.dockerClient, selectedSvc, Action{ID: ActionVersion, Label: "Version Query"}, nil)
+		}
+	case "q":
+		if selectedSvc.Name == "rocketmq" {
+			m.drawerMode = drawerTasks
+			m.drawerContent = "Querying RocketMQ DLQ stats..."
+			return m, runAction(m.config, m.dockerClient, selectedSvc, Action{ID: ActionDLQStat, Label: "DLQ Stats"}, nil)
+		}
 	case "t":
 		m.drawerMode = drawerTasks
 		return m, nil
@@ -646,6 +698,14 @@ func (m *RootModel) moveSelection(dir int) {
 				m.selectedNginxSubMode = 2
 			} else if m.selectedNginxSubMode > 2 {
 				m.selectedNginxSubMode = 0
+			}
+		case 3:
+			listLen := len(ConfigKeys)
+			m.selectedServiceIndex += dir
+			if m.selectedServiceIndex < 0 {
+				m.selectedServiceIndex = listLen - 1
+			} else if m.selectedServiceIndex >= listLen {
+				m.selectedServiceIndex = 0
 			}
 		}
 	} else if m.focus == focusDetail {

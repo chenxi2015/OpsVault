@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +15,7 @@ import (
 	"OpsVault/internal/system"
 	"OpsVault/pkg/fileutil"
 	"OpsVault/pkg/sslutil"
+	"OpsVault/pkg/sysutil"
 
 	"github.com/spf13/viper"
 )
@@ -30,7 +32,14 @@ func NewNginxDriver(cfg *viper.Viper) *NginxDriver {
 	return &NginxDriver{BaseDriver: NewBaseDriver("nginx", cfg)}
 }
 
+func (d *NginxDriver) isLinuxOrTest() bool {
+	return flag.Lookup("test.v") != nil || sysutil.IsLinux()
+}
+
 func (d *NginxDriver) Install() error {
+	if !d.isLinuxOrTest() {
+		return fmt.Errorf("nginx binary installation is only supported on Linux (CentOS/CentOS Stream)")
+	}
 	if err := newNginxInstaller(d.Config).Install(); err != nil {
 		return err
 	}
@@ -38,22 +47,37 @@ func (d *NginxDriver) Install() error {
 }
 
 func (d *NginxDriver) Start() error {
+	if !d.isLinuxOrTest() {
+		return fmt.Errorf("starting nginx service is only supported on Linux")
+	}
 	return system.StartService("nginx")
 }
 
 func (d *NginxDriver) Stop() error {
+	if !d.isLinuxOrTest() {
+		return fmt.Errorf("stopping nginx service is only supported on Linux")
+	}
 	return system.StopService("nginx")
 }
 
 func (d *NginxDriver) Restart() error {
+	if !d.isLinuxOrTest() {
+		return fmt.Errorf("restarting nginx service is only supported on Linux")
+	}
 	return system.RestartService("nginx")
 }
 
 func (d *NginxDriver) Reload() error {
+	if !d.isLinuxOrTest() {
+		return fmt.Errorf("reloading nginx service is only supported on Linux")
+	}
 	return reloadNginx()
 }
 
 func (d *NginxDriver) Uninstall(purgeData bool) error {
+	if !d.isLinuxOrTest() {
+		return fmt.Errorf("uninstalling nginx binary is only supported on Linux")
+	}
 	_ = system.StopService("nginx")
 	_ = system.DisableService("nginx")
 	plan := newNginxInstallPlan(d.Config)
@@ -77,6 +101,9 @@ func (d *NginxDriver) Uninstall(purgeData bool) error {
 }
 
 func (d *NginxDriver) Upgrade(targetVersion string) error {
+	if !d.isLinuxOrTest() {
+		return fmt.Errorf("upgrading nginx binary is only supported on Linux")
+	}
 	if targetVersion == "" {
 		return fmt.Errorf("target version is required")
 	}
@@ -252,6 +279,9 @@ func (d *NginxDriver) TailLogs(lines int) (string, error) {
 }
 
 func (d *NginxDriver) ApplySSL(domain string) error {
+	if !d.isLinuxOrTest() {
+		return fmt.Errorf("applying SSL certificates is only supported on Linux")
+	}
 	root := filepath.Join(nginxConfigString(d.Config, "nginx.www_root"), domain)
 	manager := sslutil.Manager{SSLRoot: nginxConfigString(d.Config, "nginx.ssl_root")}
 	if err := manager.Apply(domain, root); err != nil {
@@ -261,6 +291,9 @@ func (d *NginxDriver) ApplySSL(domain string) error {
 }
 
 func (d *NginxDriver) RenewSSL(domain string) error {
+	if !d.isLinuxOrTest() {
+		return fmt.Errorf("renewing SSL certificates is only supported on Linux")
+	}
 	manager := sslutil.Manager{SSLRoot: nginxConfigString(d.Config, "nginx.ssl_root")}
 	if err := manager.Renew(domain); err != nil {
 		return err
@@ -269,6 +302,9 @@ func (d *NginxDriver) RenewSSL(domain string) error {
 }
 
 func (d *NginxDriver) DeleteSSL(domain string) error {
+	if !d.isLinuxOrTest() {
+		return fmt.Errorf("deleting SSL certificates is only supported on Linux")
+	}
 	manager := sslutil.Manager{SSLRoot: nginxConfigString(d.Config, "nginx.ssl_root")}
 	if err := manager.Delete(domain); err != nil {
 		return err

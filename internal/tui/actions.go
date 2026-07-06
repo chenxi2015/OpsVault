@@ -15,6 +15,8 @@ const (
 	ActionUninstall ActionID = "uninstall"
 	ActionLogs      ActionID = "logs"
 	ActionReload    ActionID = "reload"
+	ActionVersion   ActionID = "version"
+	ActionDLQStat   ActionID = "dlq"
 )
 
 type Action struct {

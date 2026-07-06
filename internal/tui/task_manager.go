@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"OpsVault/internal/driver"
@@ -146,6 +148,32 @@ func runAction(cfg *viper.Viper, dockerCli *client.Client, service ServiceRef, a
 				output = fmt.Sprintf("Successfully deleted SSL certificate for %s.", params["domain"])
 			} else {
 				err = fmt.Errorf("service %s does not support SSL management", name)
+			}
+		case ActionVersion:
+			if rocketmqDrv, ok := drv.(interface{ Version() string }); ok {
+				output = fmt.Sprintf("RocketMQ Broker Image/Version:\n%s", rocketmqDrv.Version())
+			} else {
+				err = fmt.Errorf("service %s does not support version query", name)
+			}
+		case ActionDLQStat:
+			if rocketmqDrv, ok := drv.(interface{ DLQStat() (map[string]string, error) }); ok {
+				var stats map[string]string
+				stats, err = rocketmqDrv.DLQStat()
+				if err == nil {
+					var sb strings.Builder
+					sb.WriteString("RocketMQ DLQ Stats:\n")
+					var keys []string
+					for k := range stats {
+						keys = append(keys, k)
+					}
+					sort.Strings(keys)
+					for _, k := range keys {
+						sb.WriteString(fmt.Sprintf("  %s: %s\n", k, stats[k]))
+					}
+					output = sb.String()
+				}
+			} else {
+				err = fmt.Errorf("service %s does not support DLQ stats", name)
 			}
 		default:
 			err = fmt.Errorf("unknown action: %s", action.ID)

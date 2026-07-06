@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -16,9 +18,11 @@ import (
 	"OpsVault/pkg/dockercli"
 	"OpsVault/pkg/fileutil"
 	"OpsVault/pkg/logger"
+	"OpsVault/pkg/sysutil"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/spf13/viper"
@@ -57,7 +61,57 @@ func NewBaseDriver(name string, cli *client.Client, cfg *viper.Viper, image stri
 	return driver
 }
 
+func (d *BaseDriver) checkAndInstallDocker() error {
+	if flag.Lookup("test.v") != nil {
+		return nil
+	}
+	if d.Client != nil {
+		_, err := d.Client.Ping(context.Background())
+		if err == nil {
+			return nil
+		}
+	}
+
+	_, err := exec.LookPath("docker")
+	if err != nil {
+		if !sysutil.IsLinux() {
+			return fmt.Errorf("docker is not running. Please manually install and start Docker Desktop on your platform")
+		}
+		if !sysutil.IsRoot() {
+			return fmt.Errorf("docker client connection failed. Root privileges are required to auto-install Docker")
+		}
+
+		logger.Infof("Docker is not installed. Triggering auto-installation...")
+		scriptPath := "./scripts/install_docker.sh"
+		cmd := exec.Command("bash", scriptPath)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("auto-install docker failed: %w: %s", err, string(out))
+		}
+		logger.Infof("Docker installation completed: %s", string(out))
+	} else {
+		if !sysutil.IsLinux() {
+			return fmt.Errorf("docker is not running. Please start Docker Desktop on your platform")
+		}
+		if !sysutil.IsRoot() {
+			return fmt.Errorf("docker service is not running. Root privileges are required to start docker daemon")
+		}
+		logger.Infof("Docker is installed but not running. Trying to start docker daemon...")
+		_ = exec.Command("systemctl", "start", "docker").Run()
+	}
+
+	newCli, err := dockercli.New()
+	if err != nil {
+		return fmt.Errorf("failed to reconnect to docker daemon after installation: %w", err)
+	}
+	d.Client = newCli
+	return nil
+}
+
 func (d *BaseDriver) EnsureReady(ctx context.Context) error {
+	if err := d.checkAndInstallDocker(); err != nil {
+		return err
+	}
 	if err := fileutil.EnsureDir(d.DataDir, 0o755); err != nil {
 		return err
 	}
@@ -65,6 +119,9 @@ func (d *BaseDriver) EnsureReady(ctx context.Context) error {
 }
 
 func (d *BaseDriver) Start() error {
+	if err := d.checkAndInstallDocker(); err != nil {
+		return err
+	}
 	if d.Client == nil {
 		return fmt.Errorf("docker client is not available")
 	}
@@ -72,6 +129,9 @@ func (d *BaseDriver) Start() error {
 }
 
 func (d *BaseDriver) Stop() error {
+	if err := d.checkAndInstallDocker(); err != nil {
+		return err
+	}
 	if d.Client == nil {
 		return fmt.Errorf("docker client is not available")
 	}
@@ -87,6 +147,7 @@ func (d *BaseDriver) Restart() error {
 }
 
 func (d *BaseDriver) Uninstall(purgeData bool) error {
+	_ = d.checkAndInstallDocker() // Best effort checking before deletion
 	if d.Client != nil {
 		_ = d.Client.ContainerRemove(context.Background(), d.ContainerName, container.RemoveOptions{Force: true})
 	}
@@ -156,7 +217,12 @@ func (d *BaseDriver) installWithSpec(specFn func() (*container.Config, *containe
 	if err != nil {
 		return err
 	}
-	resp, err := d.Client.ContainerCreate(ctx, cfg, hostCfg, nil, nil, d.ContainerName)
+	networkingConfig := &network.NetworkingConfig{
+		EndpointsConfig: map[string]*network.EndpointSettings{
+			d.NetworkName: {},
+		},
+	}
+	resp, err := d.Client.ContainerCreate(ctx, cfg, hostCfg, networkingConfig, nil, d.ContainerName)
 	if err != nil {
 		return err
 	}
@@ -211,7 +277,12 @@ func (d *BaseDriver) recreateWithImage(targetVersion string, specFn func() (*con
 		return err
 	}
 
-	resp, err := d.Client.ContainerCreate(ctx, cfg, hostCfg, nil, nil, d.ContainerName)
+	networkingConfig := &network.NetworkingConfig{
+		EndpointsConfig: map[string]*network.EndpointSettings{
+			d.NetworkName: {},
+		},
+	}
+	resp, err := d.Client.ContainerCreate(ctx, cfg, hostCfg, networkingConfig, nil, d.ContainerName)
 	if err != nil {
 		d.Image = oldImage
 		if backupName != "" {
@@ -415,6 +486,9 @@ func replaceImageTag(image, targetVersion string) string {
 }
 
 func (d *BaseDriver) TailLogs(lines int) (string, error) {
+	if err := d.checkAndInstallDocker(); err != nil {
+		return "", err
+	}
 	if d.Client == nil {
 		return "", fmt.Errorf("docker client is not available")
 	}
