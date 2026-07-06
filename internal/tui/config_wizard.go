@@ -12,11 +12,11 @@ var ConfigKeys = []string{
 	"docker.network_name",
 	"docker.cidr",
 	"docker.data_root",
-	"docker.images.mysql",
-	"docker.images.redis",
-	"docker.images.rocketmq",
-	"docker.images.rabbitmq",
-	"docker.images.postgres",
+	"mysql.image",
+	"redis.image",
+	"rocketmq.image",
+	"rabbitmq.image",
+	"postgres.image",
 }
 
 // ConfigWizardView renders the config options list.

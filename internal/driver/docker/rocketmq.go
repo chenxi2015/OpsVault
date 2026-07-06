@@ -2,6 +2,8 @@ package docker
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -20,8 +22,22 @@ type RocketMQDriver struct {
 }
 
 func NewRocketMQDriver(cli DockerClient, cfg *viper.Viper) *RocketMQDriver {
-	base := NewBaseDriver("rocketmq", cli.Raw(), cfg, cfg.GetString("docker.images.rocketmq"), []string{"9876:9876", "10911:10911"})
-	return &RocketMQDriver{BaseDriver: base}
+	namesrvPort := cfg.GetInt("rocketmq.namesrv_port")
+	if namesrvPort == 0 {
+		namesrvPort = 9876
+	}
+	brokerPort := cfg.GetInt("rocketmq.broker_port")
+	if brokerPort == 0 {
+		brokerPort = 10911
+	}
+	image := cfg.GetString("rocketmq.image")
+	if image == "" {
+		image = "apache/rocketmq:5.3.0"
+	}
+	base := NewBaseDriver("rocketmq", cli.Raw(), cfg, image, []string{fmt.Sprintf("%d:%d", namesrvPort, namesrvPort), fmt.Sprintf("%d:%d", brokerPort, brokerPort)})
+	drv := &RocketMQDriver{BaseDriver: base}
+	drv.PrepareConfig = drv.prepareConfig
+	return drv
 }
 
 func (d *RocketMQDriver) Install() error {
@@ -31,13 +47,49 @@ func (d *RocketMQDriver) Install() error {
 func (d *RocketMQDriver) containerSpec() (*container.Config, *container.HostConfig, error) {
 	portNameSrv := nat.Port("9876/tcp")
 	portBroker := nat.Port("10911/tcp")
+	namesrvPort := d.Config.GetString("rocketmq.namesrv_port")
+	if namesrvPort == "" {
+		namesrvPort = "9876"
+	}
+	brokerPort := d.Config.GetString("rocketmq.broker_port")
+	if brokerPort == "" {
+		brokerPort = "10911"
+	}
+
 	script := `
 set -e
 nohup sh mqnamesrv >/home/rocketmq/logs/namesrv.log 2>&1 &
 sleep 5
 exec sh mqbroker -n 127.0.0.1:9876 -c /home/rocketmq/rocketmq-opsvault.conf
 `
-	conf := `brokerClusterName=OpsVaultCluster
+	return &container.Config{
+			Image: d.Image,
+			Cmd:   []string{"sh", "-c", script},
+			Healthcheck: &container.HealthConfig{
+				Test:        []string{"CMD-SHELL", "sh " + rocketMQToolsPath + " clusterList -n 127.0.0.1:9876 >/dev/null 2>&1"},
+				Interval:    15 * time.Second,
+				Timeout:     8 * time.Second,
+				StartPeriod: 25 * time.Second,
+				Retries:     12,
+			},
+		}, &container.HostConfig{
+			Binds: []string{
+				filepath.Join(d.DataDir, "data") + ":/home/rocketmq/store",
+				filepath.Join(d.DataDir, "conf", "broker.conf") + ":/home/rocketmq/rocketmq-opsvault.conf",
+			},
+			PortBindings: nat.PortMap{
+				portNameSrv: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: namesrvPort}},
+				portBroker:  []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: brokerPort}},
+			},
+		}, nil
+}
+
+func (d *RocketMQDriver) prepareConfig(confDir string) error {
+	filePath := filepath.Join(confDir, "broker.conf")
+	if _, err := os.Stat(filePath); err == nil {
+		return nil
+	}
+	content := `brokerClusterName=OpsVaultCluster
 brokerName=broker-a
 brokerId=0
 deleteWhen=04
@@ -52,23 +104,7 @@ storePathCommitLog=/home/rocketmq/store/commitlog
 storePathConsumeQueue=/home/rocketmq/store/consumequeue
 storePathIndex=/home/rocketmq/store/index
 `
-	return &container.Config{
-			Image: d.Image,
-			Cmd:   []string{"sh", "-c", "cat <<'EOF' >/home/rocketmq/rocketmq-opsvault.conf\n" + conf + "EOF\n" + script},
-			Healthcheck: &container.HealthConfig{
-				Test:        []string{"CMD-SHELL", "sh " + rocketMQToolsPath + " clusterList -n 127.0.0.1:9876 >/dev/null 2>&1"},
-				Interval:    15 * time.Second,
-				Timeout:     8 * time.Second,
-				StartPeriod: 25 * time.Second,
-				Retries:     12,
-			},
-		}, &container.HostConfig{
-			Binds: []string{d.DataDir + ":/home/rocketmq/store"},
-			PortBindings: nat.PortMap{
-				portNameSrv: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "9876"}},
-				portBroker:  []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "10911"}},
-			},
-		}, nil
+	return os.WriteFile(filePath, []byte(content), 0o644)
 }
 
 func (d *RocketMQDriver) Upgrade(targetVersion string) error {

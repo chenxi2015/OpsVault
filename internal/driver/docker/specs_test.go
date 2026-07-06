@@ -23,11 +23,18 @@ func testConfigWithRoot(dataRoot string) *viper.Viper {
 	cfg := viper.New()
 	cfg.Set("docker.data_root", dataRoot)
 	cfg.Set("docker.network_name", "opsvault-net")
-	cfg.Set("docker.images.mysql", "mysql:8.0")
-	cfg.Set("docker.images.redis", "redis:7-alpine")
-	cfg.Set("docker.images.rabbitmq", "rabbitmq:3-management")
-	cfg.Set("docker.images.rocketmq", "apache/rocketmq:5.3.0")
-	cfg.Set("docker.images.postgres", "postgres:15")
+	cfg.Set("mysql.image", "mysql:8.0")
+	cfg.Set("mysql.port", 3306)
+	cfg.Set("redis.image", "redis:7-alpine")
+	cfg.Set("redis.port", 6379)
+	cfg.Set("rabbitmq.image", "rabbitmq:3-management")
+	cfg.Set("rabbitmq.port", 5672)
+	cfg.Set("rabbitmq.ui_port", 15672)
+	cfg.Set("rocketmq.image", "apache/rocketmq:5.3.0")
+	cfg.Set("rocketmq.namesrv_port", 9876)
+	cfg.Set("rocketmq.broker_port", 10911)
+	cfg.Set("postgres.image", "postgres:15")
+	cfg.Set("postgres.port", 5432)
 	return cfg
 }
 
@@ -43,7 +50,9 @@ func TestMySQLContainerSpec(t *testing.T) {
 	if len(cfg.Env) != 1 || cfg.Env[0] != "MYSQL_ROOT_PASSWORD=secret" {
 		t.Fatalf("env = %#v", cfg.Env)
 	}
-	if len(host.Binds) != 1 || host.Binds[0] != filepath.Join("/data/opsvault", "mysql")+":/var/lib/mysql" {
+	if len(host.Binds) != 2 ||
+		host.Binds[0] != filepath.Join("/data/opsvault", "mysql", "data")+":/var/lib/mysql" ||
+		host.Binds[1] != filepath.Join("/data/opsvault", "mysql", "conf", "my.cnf")+":/etc/mysql/conf.d/my.cnf" {
 		t.Fatalf("binds = %#v", host.Binds)
 	}
 	port := nat.Port("3306/tcp")
@@ -58,7 +67,7 @@ func TestRedisContainerSpecWithPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("containerSpec: %v", err)
 	}
-	wantCmd := []string{"redis-server", "--appendonly", "yes", "--requirepass", "redispass"}
+	wantCmd := []string{"redis-server", "/usr/local/etc/redis/redis.conf"}
 	if len(cfg.Cmd) != len(wantCmd) {
 		t.Fatalf("cmd = %#v", cfg.Cmd)
 	}
@@ -67,7 +76,9 @@ func TestRedisContainerSpecWithPassword(t *testing.T) {
 			t.Fatalf("cmd[%d] = %q, want %q", i, cfg.Cmd[i], wantCmd[i])
 		}
 	}
-	if host.Binds[0] != filepath.Join("/data/opsvault", "redis")+":/data" {
+	if len(host.Binds) != 2 ||
+		host.Binds[0] != filepath.Join("/data/opsvault", "redis", "data")+":/data" ||
+		host.Binds[1] != filepath.Join("/data/opsvault", "redis", "conf", "redis.conf")+":/usr/local/etc/redis/redis.conf" {
 		t.Fatalf("binds = %#v", host.Binds)
 	}
 }

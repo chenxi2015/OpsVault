@@ -62,6 +62,7 @@ func init() {
 	}
 
 	rootCmd.AddCommand(newTUICommand())
+	rootCmd.AddCommand(newDoctorCommand(config, dockerFactory))
 	rootCmd.AddCommand(nginx.NewCommand(config))
 	rootCmd.AddCommand(mysql.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(redis.NewCommand(config, dockerFactory))
@@ -117,13 +118,30 @@ func applyDefaultConfig(v *viper.Viper) {
 	v.SetDefault("docker.network_name", "opsvault-net")
 	v.SetDefault("docker.cidr", "172.28.0.0/16")
 	v.SetDefault("docker.data_root", "/data/opsvault")
-	v.SetDefault("docker.images.mysql", "mysql:8.0")
-	v.SetDefault("docker.images.redis", "redis:7-alpine")
-	v.SetDefault("docker.images.rocketmq", "apache/rocketmq:5.3.0")
-	v.SetDefault("docker.images.rabbitmq", "rabbitmq:3-management")
-	v.SetDefault("docker.images.postgres", "postgres:15")
 	v.SetDefault("docker.resource_limit.cpu_max", "2")
 	v.SetDefault("docker.resource_limit.mem_max", "2g")
+
+	v.SetDefault("mysql.image", "mysql:8.0")
+	v.SetDefault("mysql.port", 3306)
+	v.SetDefault("mysql.root_password", "root")
+
+	v.SetDefault("redis.image", "redis:7-alpine")
+	v.SetDefault("redis.port", 6379)
+	v.SetDefault("redis.password", "")
+
+	v.SetDefault("rocketmq.image", "apache/rocketmq:5.3.0")
+	v.SetDefault("rocketmq.namesrv_port", 9876)
+	v.SetDefault("rocketmq.broker_port", 10911)
+
+	v.SetDefault("rabbitmq.image", "rabbitmq:3-management")
+	v.SetDefault("rabbitmq.port", 5672)
+	v.SetDefault("rabbitmq.ui_port", 15672)
+	v.SetDefault("rabbitmq.admin_user", "admin")
+	v.SetDefault("rabbitmq.admin_pwd", "password")
+
+	v.SetDefault("postgres.image", "postgres:15")
+	v.SetDefault("postgres.port", 5432)
+	v.SetDefault("postgres.password", "")
 	v.SetDefault("nginx.install_path", "/usr/local/nginx")
 	v.SetDefault("nginx.www_root", "/data/wwwroot")
 	v.SetDefault("nginx.ssl_root", "/data/ssl")

@@ -41,6 +41,7 @@ type BaseDriver struct {
 	StartupTimeout time.Duration
 
 	execInContainer func(containerName string, cmd []string) (string, error)
+	PrepareConfig   func(confDir string) error
 }
 
 func NewBaseDriver(name string, cli *client.Client, cfg *viper.Viper, image string, ports []string) *BaseDriver {
@@ -114,6 +115,19 @@ func (d *BaseDriver) EnsureReady(ctx context.Context) error {
 	}
 	if err := fileutil.EnsureDir(d.DataDir, 0o755); err != nil {
 		return err
+	}
+	confDir := filepath.Join(d.DataDir, "conf")
+	dataDir := filepath.Join(d.DataDir, "data")
+	if err := fileutil.EnsureDir(confDir, 0o755); err != nil {
+		return err
+	}
+	if err := fileutil.EnsureDir(dataDir, 0o755); err != nil {
+		return err
+	}
+	if d.PrepareConfig != nil {
+		if err := d.PrepareConfig(confDir); err != nil {
+			return err
+		}
 	}
 	return dockercli.EnsureNetwork(ctx, d.Client, d.NetworkName, d.Config.GetString("docker.cidr"))
 }
@@ -217,6 +231,7 @@ func (d *BaseDriver) installWithSpec(specFn func() (*container.Config, *containe
 	if err != nil {
 		return err
 	}
+	d.applyResources(hostCfg)
 	networkingConfig := &network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{
 			d.NetworkName: {},
@@ -276,6 +291,7 @@ func (d *BaseDriver) recreateWithImage(targetVersion string, specFn func() (*con
 		}
 		return err
 	}
+	d.applyResources(hostCfg)
 
 	networkingConfig := &network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{
@@ -509,4 +525,53 @@ func (d *BaseDriver) TailLogs(lines int) (string, error) {
 		return "", err
 	}
 	return stdout.String() + stderr.String(), nil
+}
+
+func (d *BaseDriver) getResourceLimits() (float64, int64) {
+	cpuStr := d.Config.GetString(d.Name + ".cpu_max")
+	if cpuStr == "" {
+		cpuStr = d.Config.GetString("docker.resource_limit.cpu_max")
+	}
+	memStr := d.Config.GetString(d.Name + ".mem_max")
+	if memStr == "" {
+		memStr = d.Config.GetString("docker.resource_limit.mem_max")
+	}
+
+	var cpu float64
+	if cpuStr != "" {
+		fmt.Sscanf(cpuStr, "%f", &cpu)
+	}
+
+	var mem int64
+	if memStr != "" {
+		memStr = strings.ToLower(strings.TrimSpace(memStr))
+		var val float64
+		if strings.HasSuffix(memStr, "g") {
+			fmt.Sscanf(strings.TrimSuffix(memStr, "g"), "%f", &val)
+			mem = int64(val * 1024 * 1024 * 1024)
+		} else if strings.HasSuffix(memStr, "m") {
+			fmt.Sscanf(strings.TrimSuffix(memStr, "m"), "%f", &val)
+			mem = int64(val * 1024 * 1024)
+		} else if strings.HasSuffix(memStr, "k") {
+			fmt.Sscanf(strings.TrimSuffix(memStr, "k"), "%f", &val)
+			mem = int64(val * 1024)
+		} else {
+			fmt.Sscanf(memStr, "%f", &val)
+			mem = int64(val)
+		}
+	}
+	return cpu, mem
+}
+
+func (d *BaseDriver) applyResources(hostCfg *container.HostConfig) {
+	if hostCfg == nil {
+		return
+	}
+	cpu, mem := d.getResourceLimits()
+	if cpu > 0 {
+		hostCfg.Resources.NanoCPUs = int64(cpu * 1e9)
+	}
+	if mem > 0 {
+		hostCfg.Resources.Memory = mem
+	}
 }

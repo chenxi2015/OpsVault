@@ -1,6 +1,9 @@
 package docker
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -15,8 +18,34 @@ type RabbitMQDriver struct {
 }
 
 func NewRabbitMQDriver(cli DockerClient, cfg *viper.Viper, user, pass string) *RabbitMQDriver {
-	base := NewBaseDriver("rabbitmq", cli.Raw(), cfg, cfg.GetString("docker.images.rabbitmq"), []string{"5672:5672", "15672:15672"})
-	return &RabbitMQDriver{BaseDriver: base, user: user, pass: pass}
+	port := cfg.GetInt("rabbitmq.port")
+	if port == 0 {
+		port = 5672
+	}
+	uiPort := cfg.GetInt("rabbitmq.ui_port")
+	if uiPort == 0 {
+		uiPort = 15672
+	}
+	image := cfg.GetString("rabbitmq.image")
+	if image == "" {
+		image = "rabbitmq:3-management"
+	}
+	if user == "" {
+		user = cfg.GetString("rabbitmq.admin_user")
+	}
+	if user == "" {
+		user = "admin"
+	}
+	if pass == "" {
+		pass = cfg.GetString("rabbitmq.admin_pwd")
+	}
+	if pass == "" {
+		pass = "password"
+	}
+	base := NewBaseDriver("rabbitmq", cli.Raw(), cfg, image, []string{fmt.Sprintf("%d:%d", port, port), fmt.Sprintf("%d:%d", uiPort, uiPort)})
+	drv := &RabbitMQDriver{BaseDriver: base, user: user, pass: pass}
+	drv.PrepareConfig = drv.prepareConfig
+	return drv
 }
 
 func (d *RabbitMQDriver) Install() error {
@@ -26,6 +55,15 @@ func (d *RabbitMQDriver) Install() error {
 func (d *RabbitMQDriver) containerSpec() (*container.Config, *container.HostConfig, error) {
 	portAMQP := nat.Port("5672/tcp")
 	portUI := nat.Port("15672/tcp")
+	hostPort := d.Config.GetString("rabbitmq.port")
+	if hostPort == "" {
+		hostPort = "5672"
+	}
+	hostUIPort := d.Config.GetString("rabbitmq.ui_port")
+	if hostUIPort == "" {
+		hostUIPort = "15672"
+	}
+
 	return &container.Config{
 			Image: d.Image,
 			Env: []string{
@@ -40,12 +78,28 @@ func (d *RabbitMQDriver) containerSpec() (*container.Config, *container.HostConf
 				Retries:     12,
 			},
 		}, &container.HostConfig{
-			Binds: []string{d.DataDir + ":/var/lib/rabbitmq"},
+			Binds: []string{
+				filepath.Join(d.DataDir, "data") + ":/var/lib/rabbitmq",
+				filepath.Join(d.DataDir, "conf", "rabbitmq.conf") + ":/etc/rabbitmq/rabbitmq.conf",
+			},
 			PortBindings: nat.PortMap{
-				portAMQP: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "5672"}},
-				portUI:   []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "15672"}},
+				portAMQP: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: hostPort}},
+				portUI:   []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: hostUIPort}},
 			},
 		}, nil
+}
+
+func (d *RabbitMQDriver) prepareConfig(confDir string) error {
+	filePath := filepath.Join(confDir, "rabbitmq.conf")
+	if _, err := os.Stat(filePath); err == nil {
+		return nil
+	}
+	content := fmt.Sprintf(`loopback_users.guest = false
+listeners.tcp.default = 5672
+default_user = %s
+default_pass = %s
+`, d.user, d.pass)
+	return os.WriteFile(filePath, []byte(content), 0o644)
 }
 
 func (d *RabbitMQDriver) Upgrade(targetVersion string) error {

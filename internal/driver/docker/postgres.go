@@ -1,6 +1,8 @@
 package docker
 
 import (
+	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -14,7 +16,18 @@ type PostgresDriver struct {
 }
 
 func NewPostgresDriver(cli DockerClient, cfg *viper.Viper, password string) *PostgresDriver {
-	base := NewBaseDriver("postgres", cli.Raw(), cfg, cfg.GetString("docker.images.postgres"), []string{"5432:5432"})
+	port := cfg.GetInt("postgres.port")
+	if port == 0 {
+		port = 5432
+	}
+	image := cfg.GetString("postgres.image")
+	if image == "" {
+		image = "postgres:15"
+	}
+	if password == "" {
+		password = cfg.GetString("postgres.password")
+	}
+	base := NewBaseDriver("postgres", cli.Raw(), cfg, image, []string{fmt.Sprintf("%d:%d", port, port)})
 	return &PostgresDriver{BaseDriver: base, password: password}
 }
 
@@ -24,6 +37,10 @@ func (d *PostgresDriver) Install() error {
 
 func (d *PostgresDriver) containerSpec() (*container.Config, *container.HostConfig, error) {
 	port := nat.Port("5432/tcp")
+	hostPort := d.Config.GetString("postgres.port")
+	if hostPort == "" {
+		hostPort = "5432"
+	}
 	return &container.Config{
 			Image: d.Image,
 			Env:   []string{"POSTGRES_PASSWORD=" + d.password},
@@ -35,9 +52,9 @@ func (d *PostgresDriver) containerSpec() (*container.Config, *container.HostConf
 				Retries:     10,
 			},
 		}, &container.HostConfig{
-			Binds: []string{d.DataDir + ":/var/lib/postgresql/data"},
+			Binds: []string{filepath.Join(d.DataDir, "data") + ":/var/lib/postgresql/data"},
 			PortBindings: nat.PortMap{
-				port: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "5432"}},
+				port: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: hostPort}},
 			},
 		}, nil
 }

@@ -1,12 +1,14 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
 
 	"OpsVault/internal/driver"
+	"OpsVault/internal/system"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -58,6 +60,11 @@ type statusesLoadedMsg struct {
 	err      error
 }
 
+type doctorFinishedMsg struct {
+	items []system.DiagnosticItem
+	err   error
+}
+
 type RootModel struct {
 	active               int
 	tabs                 []string
@@ -90,6 +97,10 @@ type RootModel struct {
 	textInputPrompt string
 	textInputState  string // "vhost_domain", "vhost_root", "ssl_apply_domain"
 	textInputValue  string
+
+	// Doctor specific states
+	doctorItems   []system.DiagnosticItem
+	doctorRunning bool
 }
 
 func NewRootModel(provider ...StatusProvider) RootModel {
@@ -99,7 +110,7 @@ func NewRootModel(provider ...StatusProvider) RootModel {
 	}
 
 	m := RootModel{
-		tabs:  []string{"Dashboard", "Nginx", "Docker", "Config"},
+		tabs:  []string{"Dashboard", "Nginx", "Docker", "Doctor", "Config"},
 		focus: focusSidebar,
 	}
 
@@ -180,11 +191,19 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.active > 0 {
 				m.active--
 				m.resetSubNavigation()
+				if m.active == 3 && len(m.doctorItems) == 0 {
+					m.doctorRunning = true
+					return m, m.runDiagnosticsCmd()
+				}
 			}
 		case "right", "l":
 			if m.active < len(m.tabs)-1 {
 				m.active++
 				m.resetSubNavigation()
+				if m.active == 3 && len(m.doctorItems) == 0 {
+					m.doctorRunning = true
+					return m, m.runDiagnosticsCmd()
+				}
 			}
 		case "up", "k":
 			m.moveSelection(-1)
@@ -218,6 +237,15 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, tickRefresh() // Start next tick refresh interval
+
+	case doctorFinishedMsg:
+		m.doctorRunning = false
+		if msg.err != nil {
+			m.lastErr = msg.err
+		} else {
+			m.doctorItems = msg.items
+		}
+		return m, nil
 
 	case taskFinishedMsg:
 		m.drawerContent = msg.Output
@@ -269,6 +297,8 @@ func (m *RootModel) View() string {
 		body = m.nginxView()
 	case 2:
 		body = m.dockerView()
+	case 3:
+		body = m.doctorView()
 	default:
 		body = ConfigWizardView(*m)
 	}
@@ -430,7 +460,15 @@ func (m *RootModel) handleInputSubmit() (tea.Model, tea.Cmd) {
 }
 
 func (m *RootModel) handleShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.active == 3 {
+	if m.active == 3 { // Doctor Tab
+		if msg.String() == "r" {
+			m.doctorRunning = true
+			return m, m.runDiagnosticsCmd()
+		}
+		return m, nil
+	}
+
+	if m.active == 4 {
 		if msg.String() == "enter" && m.selectedServiceIndex < len(ConfigKeys) {
 			configKey := ConfigKeys[m.selectedServiceIndex]
 			m.editing = true
@@ -656,6 +694,18 @@ func (m *RootModel) nginxView() string {
 	return NginxPanelView(*m)
 }
 
+func (m *RootModel) doctorView() string {
+	return DoctorPanelView(*m)
+}
+
+func (m *RootModel) runDiagnosticsCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		items, err := system.RunDiagnostics(ctx, m.config, m.dockerClient)
+		return doctorFinishedMsg{items: items, err: err}
+	}
+}
+
 func tickRefresh() tea.Cmd {
 	return tea.Tick(refreshInterval, func(time.Time) tea.Msg {
 		return refreshTickMsg{}
@@ -699,7 +749,7 @@ func (m *RootModel) moveSelection(dir int) {
 			} else if m.selectedNginxSubMode > 2 {
 				m.selectedNginxSubMode = 0
 			}
-		case 3:
+		case 4:
 			listLen := len(ConfigKeys)
 			m.selectedServiceIndex += dir
 			if m.selectedServiceIndex < 0 {
