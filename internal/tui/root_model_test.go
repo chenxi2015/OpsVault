@@ -25,8 +25,8 @@ func TestRootModelTickRefreshesStatuses(t *testing.T) {
 		},
 	}
 
-	updated, cmd := model.Update(msg)
-	root := updated.(RootModel)
+	updated, cmd := (&model).Update(msg)
+	root := updated.(*RootModel)
 	if cmd == nil {
 		t.Fatal("expected next refresh command")
 	}
@@ -46,7 +46,7 @@ func TestRootModelTickCommandEmitsRefreshMessage(t *testing.T) {
 		"nginx": {Name: "nginx", Status: "running", Running: true},
 	})
 
-	cmd := model.Init()
+	cmd := (&model).Init()
 	if cmd == nil {
 		t.Fatal("Init returned nil command")
 	}
@@ -68,7 +68,7 @@ func TestLoadStatusesReturnsRefreshMessage(t *testing.T) {
 		"mysql": {Name: "mysql", Status: "healthy", Running: true, UpdatedAt: time.Now()},
 	})
 
-	msg := model.loadStatuses()()
+	msg := (&model).loadStatuses()()
 	loaded, ok := msg.(statusesLoadedMsg)
 	if !ok {
 		t.Fatalf("message type = %T, want statusesLoadedMsg", msg)
@@ -120,3 +120,22 @@ func TestServiceRegistryAndActions(t *testing.T) {
 	}
 }
 
+func TestRootModelFocusAndDrawer(t *testing.T) {
+	model := NewRootModel(StaticStatusProvider{})
+	// Confirm focus starts at sidebar or detail
+	if model.focus != focusSidebar {
+		t.Errorf("expected initial focus to be focusSidebar, got %v", model.focus)
+	}
+
+	// Simulate tab key to cycle focus
+	updated, _ := (&model).Update(tea.KeyMsg{Type: tea.KeyTab, Runes: []rune{}})
+	root := updated.(*RootModel)
+	if root.focus != focusDetail {
+		t.Errorf("expected Tab key to cycle focus to focusDetail, got %v", root.focus)
+	}
+
+	// Confirm drawer mode defaults to hidden
+	if root.drawerMode != drawerHidden {
+		t.Errorf("expected initial drawer to be drawerHidden, got %v", root.drawerMode)
+	}
+}

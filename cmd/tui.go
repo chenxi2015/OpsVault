@@ -13,7 +13,8 @@ func newTUICommand() *cobra.Command {
 		Short: "Launch the OpsVault terminal UI",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			provider := tui.NewRuntimeStatusProvider(AppConfig(), DockerClient)
-			program := tea.NewProgram(tui.NewRootModel(provider), tea.WithAltScreen())
+			model := tui.NewRootModel(provider)
+			program := tea.NewProgram(&model, tea.WithAltScreen())
 			_, err := program.Run()
 			return err
 		},
