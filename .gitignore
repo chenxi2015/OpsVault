@@ -1,0 +1,6 @@
+.DS_Store
+.idea/
+.vscode/
+.worktrees/
+.gitignore
+OpsVault
