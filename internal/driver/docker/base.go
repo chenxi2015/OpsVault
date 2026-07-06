@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -412,3 +413,27 @@ func replaceImageTag(image, targetVersion string) string {
 	}
 	return image + ":" + targetVersion
 }
+
+func (d *BaseDriver) TailLogs(lines int) (string, error) {
+	if d.Client == nil {
+		return "", fmt.Errorf("docker client is not available")
+	}
+	ctx := context.Background()
+	reader, err := d.Client.ContainerLogs(ctx, d.ContainerName, container.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Tail:       strconv.Itoa(lines),
+	})
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
+
+	var stdout, stderr bytes.Buffer
+	_, err = stdcopy.StdCopy(&stdout, &stderr, reader)
+	if err != nil {
+		return "", err
+	}
+	return stdout.String() + stderr.String(), nil
+}
+

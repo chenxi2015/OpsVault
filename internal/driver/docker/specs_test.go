@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"OpsVault/internal/driver"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
@@ -444,3 +446,11 @@ func (t *rewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	req.URL.Host = strings.TrimPrefix(t.baseURL, "http://")
 	return t.rt.RoundTrip(req)
 }
+
+func TestDockerLogReaderCapability(t *testing.T) {
+	drv := NewMySQLDriver(WrapClient(nil), testConfigWithRoot("/data/opsvault"), "secret")
+	if _, ok := interface{}(drv).(driver.LogReader); !ok {
+		t.Fatalf("MySQLDriver does not implement driver.LogReader")
+	}
+}
+

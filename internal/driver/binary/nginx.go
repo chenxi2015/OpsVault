@@ -3,14 +3,17 @@ package binary
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"OpsVault/internal/driver"
 	"OpsVault/internal/system"
 	"OpsVault/pkg/fileutil"
+	"OpsVault/pkg/sslutil"
 
 	"github.com/spf13/viper"
 )
@@ -241,3 +244,35 @@ func extractRootPath(conf string) string {
 	}
 	return strings.TrimSpace(matches[1])
 }
+
+func (d *NginxDriver) TailLogs(lines int) (string, error) {
+	journal := exec.Command("journalctl", "-u", "nginx", "-n", strconv.Itoa(lines), "--no-pager")
+	out, err := journal.CombinedOutput()
+	return string(out), err
+}
+
+func (d *NginxDriver) ApplySSL(domain string) error {
+	root := filepath.Join(nginxConfigString(d.Config, "nginx.www_root"), domain)
+	manager := sslutil.Manager{SSLRoot: nginxConfigString(d.Config, "nginx.ssl_root")}
+	if err := manager.Apply(domain, root); err != nil {
+		return err
+	}
+	return d.EnableSSL(domain)
+}
+
+func (d *NginxDriver) RenewSSL(domain string) error {
+	manager := sslutil.Manager{SSLRoot: nginxConfigString(d.Config, "nginx.ssl_root")}
+	if err := manager.Renew(domain); err != nil {
+		return err
+	}
+	return d.Reload()
+}
+
+func (d *NginxDriver) DeleteSSL(domain string) error {
+	manager := sslutil.Manager{SSLRoot: nginxConfigString(d.Config, "nginx.ssl_root")}
+	if err := manager.Delete(domain); err != nil {
+		return err
+	}
+	return d.DisableSSL(domain)
+}
+

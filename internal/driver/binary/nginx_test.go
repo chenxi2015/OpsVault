@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"OpsVault/internal/driver"
+
 	"github.com/spf13/viper"
 )
 
@@ -222,3 +224,22 @@ func TestEnableAndDisableSSLRewritesVHostConfig(t *testing.T) {
 		t.Fatalf("reloads after disable = %d, want 3", reloads)
 	}
 }
+
+func TestNginxDriverCapabilities(t *testing.T) {
+	cfg := testNginxConfig(t)
+	drv := NewNginxDriver(cfg)
+
+	if _, ok := interface{}(drv).(driver.LogReader); !ok {
+		t.Errorf("NginxDriver does not implement driver.LogReader")
+	}
+	if _, ok := interface{}(drv).(driver.Reloadable); !ok {
+		t.Errorf("NginxDriver does not implement driver.Reloadable")
+	}
+	if _, ok := interface{}(drv).(driver.VHostManager); !ok {
+		t.Errorf("NginxDriver does not implement driver.VHostManager")
+	}
+	if _, ok := interface{}(drv).(driver.SSLManager); !ok {
+		t.Errorf("NginxDriver does not implement driver.SSLManager")
+	}
+}
+

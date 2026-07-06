@@ -33,3 +33,24 @@ type ServiceDriver interface {
 	Upgrade(targetVersion string) error
 	Status() (*ServiceStatus, error)
 }
+
+type LogReader interface {
+	TailLogs(lines int) (string, error)
+}
+
+type Reloadable interface {
+	Reload() error
+}
+
+type VHostManager interface {
+	AddVHost(domain, root string) error
+	DeleteVHost(domain string, deleteRoot bool) error
+	ListVHosts() ([]map[string]string, error)
+}
+
+type SSLManager interface {
+	ApplySSL(domain string) error
+	RenewSSL(domain string) error
+	DeleteSSL(domain string) error
+}
+
