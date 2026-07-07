@@ -42,9 +42,6 @@ func NewRabbitMQDriver(cli DockerClient, cfg *viper.Viper, user, pass string) *R
 	if pass == "" {
 		pass = cfg.GetString("rabbitmq.admin_pwd")
 	}
-	if pass == "" {
-		pass = "password"
-	}
 	base := NewBaseDriver("rabbitmq", cli.Raw(), cfg, image, []string{fmt.Sprintf("%d:5672", port), fmt.Sprintf("%d:15672", uiPort)})
 	drv := &RabbitMQDriver{BaseDriver: base, user: user, pass: pass}
 	drv.PrepareConfig = drv.prepareConfig
@@ -52,6 +49,12 @@ func NewRabbitMQDriver(cli DockerClient, cfg *viper.Viper, user, pass string) *R
 }
 
 func (d *RabbitMQDriver) Install() error {
+	if d.pass == "" {
+		pwd := credutil.GenPassword(20)
+		d.pass = pwd
+		d.Config.Set("rabbitmq.admin_pwd", pwd)
+		_ = d.Config.WriteConfig()
+	}
 	return d.installWithSpec(d.containerSpec)
 }
 

@@ -33,9 +33,6 @@ func runAction(cfg *viper.Viper, dockerCli *client.Client, service ServiceRef, a
 			switch name {
 			case "mysql":
 				rootPwd := params["root-pwd"]
-				if rootPwd == "" {
-					rootPwd = "root"
-				}
 				drv = dockdrv.NewMySQLDriver(dockdrv.WrapClient(dockerCli), cfg, rootPwd)
 			case "redis":
 				pwd := params["pwd"]
@@ -43,18 +40,15 @@ func runAction(cfg *viper.Viper, dockerCli *client.Client, service ServiceRef, a
 			case "rabbitmq":
 				user := params["admin-user"]
 				if user == "" {
+					user = cfg.GetString("rabbitmq.admin_user")
+				}
+				if user == "" {
 					user = "admin"
 				}
 				pass := params["admin-pwd"]
-				if pass == "" {
-					pass = "123456"
-				}
 				drv = dockdrv.NewRabbitMQDriver(dockdrv.WrapClient(dockerCli), cfg, user, pass)
 			case "postgres":
 				pwd := params["pwd"]
-				if pwd == "" {
-					pwd = "postgres"
-				}
 				drv = dockdrv.NewPostgresDriver(dockdrv.WrapClient(dockerCli), cfg, pwd)
 			}
 		}

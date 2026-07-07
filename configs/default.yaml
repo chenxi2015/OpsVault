@@ -1,17 +1,14 @@
+backup:
+    storage_path: /data/opsvault/bak
 docker:
-    name_prefix: opsvault
+    bind_ip: 0.0.0.0
     cidr: 172.28.0.0/16
     data_root: /data/opsvault
+    name_prefix: opsvault
     network_name: opsvault-net
-    # Port binding address for all Docker containers.
-    # Use "0.0.0.0" to expose ports to all interfaces (default, accessible from outside).
-    # Use "127.0.0.1" to restrict access to localhost only (more secure).
-    bind_ip: "0.0.0.0"
     resource_limit:
         cpu_max: "2"
         mem_max: 2g
-backup:
-    storage_path: /data/opsvault/bak
 log:
     level: info
     storage_path: /data/opsvault/logs
@@ -19,7 +16,6 @@ mode: docker
 mysql:
     image: mysql:8.0
     port: 3306
-    # Leave empty to use --pwd flag or --random-pwd during install
     root_password: ""
 nginx:
     install_path: /usr/local/nginx
@@ -36,11 +32,9 @@ nginx:
     wwwlogs_root: /data/wwwlogs
 postgres:
     image: postgres:15
-    # Leave empty to use --pwd flag or --random-pwd during install
     password: ""
     port: 5432
 rabbitmq:
-    # Leave empty to use --admin-user/--admin-pwd flags or --random-pwd during install
     admin_pwd: ""
     admin_user: admin
     image: rabbitmq:3-management
@@ -48,7 +42,6 @@ rabbitmq:
     ui_port: 15672
 redis:
     image: redis:7-alpine
-    # Leave empty to use --pwd flag or --random-pwd during install
     password: ""
     port: 6379
 rocketmq:

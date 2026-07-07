@@ -38,6 +38,12 @@ func NewRedisDriver(cli DockerClient, cfg *viper.Viper, password string) *RedisD
 }
 
 func (d *RedisDriver) Install() error {
+	if d.password == "" {
+		pwd := credutil.GenPassword(20)
+		d.password = pwd
+		d.Config.Set("redis.password", pwd)
+		_ = d.Config.WriteConfig()
+	}
 	return d.installWithSpec(d.containerSpec)
 }
 

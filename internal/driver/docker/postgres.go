@@ -35,6 +35,12 @@ func NewPostgresDriver(cli DockerClient, cfg *viper.Viper, password string) *Pos
 }
 
 func (d *PostgresDriver) Install() error {
+	if d.password == "" {
+		pwd := credutil.GenPassword(20)
+		d.password = pwd
+		d.Config.Set("postgres.password", pwd)
+		_ = d.Config.WriteConfig()
+	}
 	return d.installWithSpec(d.containerSpec)
 }
 

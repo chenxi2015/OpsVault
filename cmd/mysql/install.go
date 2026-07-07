@@ -28,9 +28,6 @@ func (c *commandSet) newInstallCommand() *cobra.Command {
 			} else if rootPwd == "" {
 				rootPwd = c.config.GetString("mysql.root_password")
 			}
-			if rootPwd == "" {
-				return fmt.Errorf("MySQL root password is required: use --root-pwd <pwd> or --random-pwd")
-			}
 			drv, err := c.driver(rootPwd)
 			if err != nil {
 				return err

@@ -4,3 +4,4 @@
 .worktrees/
 .gitignore
 OpsVault
+bin/*

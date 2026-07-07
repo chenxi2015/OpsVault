@@ -31,9 +31,6 @@ func NewMySQLDriver(cli DockerClient, cfg *viper.Viper, rootPassword string) *My
 	if rootPassword == "" {
 		rootPassword = cfg.GetString("mysql.root_password")
 	}
-	if rootPassword == "" {
-		rootPassword = "root"
-	}
 	base := NewBaseDriver("mysql", cli.Raw(), cfg, image, []string{fmt.Sprintf("%d:3306", port)})
 	drv := &MySQLDriver{BaseDriver: base, rootPassword: rootPassword}
 	drv.PrepareConfig = drv.prepareConfig
@@ -41,6 +38,12 @@ func NewMySQLDriver(cli DockerClient, cfg *viper.Viper, rootPassword string) *My
 }
 
 func (d *MySQLDriver) Install() error {
+	if d.rootPassword == "" {
+		pwd := credutil.GenPassword(20)
+		d.rootPassword = pwd
+		d.Config.Set("mysql.root_password", pwd)
+		_ = d.Config.WriteConfig()
+	}
 	return d.installWithSpec(d.containerSpec)
 }
 

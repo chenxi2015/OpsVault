@@ -39,6 +39,12 @@ OpsVault 是一个面向 CentOS 7 / CentOS Stream 的运维工具箱，提供：
 opsvault --config /path/to/config.yaml mysql status
 ```
 
+### 自动生成随机密码说明
+
+为了保证数据库等中间件的部署安全性：
+- 如果 `default.yaml` 中相关服务的密码项被配置为空（例如 `mysql.root_password: ""`、`redis.password: ""`、`postgres.password: ""` 或 `rabbitmq.admin_pwd: ""`），且在 CLI 或 TUI 安装时未额外指定自定义密码参数，系统将**自动生成一个 20 位的强随机密码**。
+- 生成的随机密码会**自动持久化写回配置文件**中。这确保了后续查看状态 (`status`)、读取凭证 (`credentials`)、重启或容器重建等操作对密码读取的一致性。
+
 ## 配置备份与恢复 (bak)
 
 `opsvault bak` 子命令用于备份和恢复各中间件服务的配置文件（如 MySQL 的 `my.cnf`、Redis 的 `redis.conf`、Nginx 的 `conf/` 目录等）以及全局 `default.yaml` 配置文件。

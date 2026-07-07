@@ -1,8 +1,6 @@
 package rabbitmq
 
 import (
-	"fmt"
-
 	"OpsVault/cmd/common"
 	"OpsVault/internal/driver"
 	"OpsVault/pkg/credutil"
@@ -33,9 +31,6 @@ func (c *commandSet) newInstallCommand() *cobra.Command {
 			}
 			if user == "" {
 				user = "admin"
-			}
-			if pass == "" {
-				return fmt.Errorf("RabbitMQ admin password is required: use --admin-pwd <pwd> or --random-pwd")
 			}
 			drv, err := c.driver(user, pass)
 			if err != nil {

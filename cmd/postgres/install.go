@@ -1,8 +1,6 @@
 package postgres
 
 import (
-	"fmt"
-
 	"OpsVault/cmd/common"
 	"OpsVault/internal/driver"
 	"OpsVault/pkg/credutil"
@@ -26,9 +24,6 @@ func (c *commandSet) newInstallCommand() *cobra.Command {
 				password = credutil.GenPassword(20)
 			} else if password == "" {
 				password = c.config.GetString("postgres.password")
-			}
-			if password == "" {
-				return fmt.Errorf("PostgreSQL password is required: use --pwd <pwd> or --random-pwd")
 			}
 			drv, err := c.driver(password)
 			if err != nil {
