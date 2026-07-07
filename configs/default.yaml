@@ -1,50 +1,52 @@
 backup:
-    storage_path: /data/opsvault/bak
+    storage_path: /data/opsvault/bak  # 配置文件备份存储路径
 docker:
-    bind_ip: 0.0.0.0
-    cidr: 172.28.0.0/16
-    data_root: /data/opsvault
-    name_prefix: opsvault
-    network_name: opsvault-net
+    bind_ip: 0.0.0.0  # 容器端口在宿主机上绑定的IP地址
+    cidr: 172.28.0.0/16  # 专用桥接网络的 CIDR 网段
+    data_root: /data/opsvault  # 宿主机数据挂载的根目录
+    name_prefix: opsvault  # 容器与网络名称的统一前缀
+    network_name: opsvault-net  # Docker 网络桥接网卡名称
     resource_limit:
-        cpu_max: "2"
-        mem_max: 2g
+        cpu_max: "2"  # 每个容器分配的最大 CPU 核心数
+        mem_max: 2g  # 每个容器分配的最大内存限制
 log:
-    level: info
-    storage_path: /data/opsvault/logs
-mode: docker
+    level: info  # 日志级别 (debug, info, warn, error)
+    storage_path: /data/opsvault/logs  # 应用程序日志存储路径
+mode: docker  # 默认部署模式 (docker 或 binary)
 mysql:
-    image: mysql:8.0
-    port: 3306
-    root_password: ""
+    image: mysql:8.0  # MySQL Docker 镜像标签
+    port: 3306  # 映射到宿主机的 MySQL 端口
+    root_password: ""  # MySQL root 密码（留空则自动生成随机密码）
 nginx:
-    install_path: /usr/local/nginx
-    logrotate_path: /etc/logrotate.d/nginx
-    openssl_version: 1.1.1w
-    pcre_version: "8.45"
-    run_group: www
-    run_user: www
-    source_root: /usr/local/src/opsvault-nginx
-    ssl_root: /data/ssl
-    systemd_unit_path: /lib/systemd/system/nginx.service
-    version: 1.31.0
-    www_root: /data/wwwroot
-    wwwlogs_root: /data/wwwlogs
+    install_path: /usr/local/nginx  # Nginx 安装目录（仅 binary 模式生效）
+    logrotate_path: /etc/logrotate.d/nginx  # Nginx 日志轮转配置文件路径
+    openssl_version: 1.1.1w  # 编译 Nginx 时使用的 OpenSSL 版本
+    pcre_version: "8.45"  # 编译 Nginx 时使用的 PCRE 版本
+    run_group: www  # Nginx 运行时的用户组
+    run_user: www  # Nginx 运行时的用户名
+    source_root: /usr/local/src/opsvault-nginx  # Nginx 源码下载与编译路径
+    ssl_root: /data/ssl  # SSL 证书存储目录
+    systemd_unit_path: /lib/systemd/system/nginx.service  # Nginx systemd 服务文件路径
+    version: 1.31.0  # 准备编译的 Nginx 版本
+    www_root: /data/wwwroot  # 网站根目录
+    wwwlogs_root: /data/wwwlogs  # Nginx 访问与错误日志目录
 postgres:
-    image: postgres:15
-    password: ""
-    port: 5432
+    image: postgres:15  # PostgreSQL Docker 镜像标签
+    password: ""  # PostgreSQL 密码（留空则自动生成随机密码）
+    port: 5432  # 映射到宿主机的 PostgreSQL 端口
 rabbitmq:
-    admin_pwd: ""
-    admin_user: admin
-    image: rabbitmq:3-management
-    port: 5672
-    ui_port: 15672
+    admin_pwd: ""  # RabbitMQ 管理员密码（留空则自动生成随机密码）
+    admin_user: admin  # RabbitMQ 管理员用户名
+    image: rabbitmq:3-management  # RabbitMQ Docker 镜像标签
+    port: 5672  # 映射到宿主机的 RabbitMQ AMQP 端口
+    ui_port: 15672  # 映射到宿主机的 RabbitMQ 管理后台端口
 redis:
-    image: redis:7-alpine
-    password: ""
-    port: 6379
+    image: redis:7-alpine  # Redis Docker 镜像标签
+    password: ""  # Redis 访问密码（留空则自动生成随机密码）
+    port: 6379  # 映射到宿主机的 Redis 端口
 rocketmq:
-    broker_port: 10911
-    image: apache/rocketmq:5.3.0
-    namesrv_port: 9876
+    broker_port: 10911  # 映射到宿主机的 RocketMQ Broker 端口
+    image: apache/rocketmq:5.3.0  # RocketMQ Docker 镜像标签
+    namesrv_port: 9876  # 映射到宿主机的 RocketMQ NameServer 端口
+
+
