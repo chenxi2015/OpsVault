@@ -71,6 +71,7 @@ func newInitModel() *initModel {
 			{name: "rocketmq", selected: false},
 			{name: "rabbitmq", selected: false},
 			{name: "postgres", selected: false},
+			{name: "elk", selected: false},
 		},
 	}
 }

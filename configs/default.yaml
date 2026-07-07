@@ -49,5 +49,11 @@ rocketmq:
     broker_port: 10911  # 映射到宿主机的 RocketMQ Broker 端口
     image: apache/rocketmq:5.3.0  # RocketMQ Docker 镜像标签
     namesrv_port: 9876  # 映射到宿主机的 RocketMQ NameServer 端口
-
-
+elk:
+    elasticsearch_image: "elasticsearch:8.12.0"  # Elasticsearch Docker 镜像标签
+    elasticsearch_port: 9200  # 映射到宿主机的 Elasticsearch REST API 端口
+    kibana_image: "kibana:8.12.0"  # Kibana Docker 镜像标签
+    kibana_port: 5601  # 映射到宿主机的 Kibana Web 界面端口
+    logstash_image: "logstash:8.12.0"  # Logstash Docker 镜像标签
+    logstash_port: 5044  # 映射到宿主机的 Logstash Beats 输入端口
+    es_java_opts: "-Xms512m -Xmx512m"  # Elasticsearch JVM 堆内存大小限制设置

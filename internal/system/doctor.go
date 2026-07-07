@@ -275,6 +275,9 @@ func checkPorts(config *viper.Viper) DiagnosticItem {
 		{Service: "RabbitMQ 消息队列", ConfigKey: "rabbitmq.port", Default: 5672},
 		{Service: "RabbitMQ Web 控制台", ConfigKey: "rabbitmq.ui_port", Default: 15672},
 		{Service: "PostgreSQL 数据库", ConfigKey: "postgres.port", Default: 5432},
+		{Service: "Elasticsearch REST API", ConfigKey: "elk.elasticsearch_port", Default: 9200},
+		{Service: "Kibana Web 界面", ConfigKey: "elk.kibana_port", Default: 5601},
+		{Service: "Logstash Beats 输入", ConfigKey: "elk.logstash_port", Default: 5044},
 	}
 
 	type Row struct {

@@ -13,6 +13,7 @@ import (
 	"OpsVault/cmd/rabbitmq"
 	"OpsVault/cmd/redis"
 	"OpsVault/cmd/rocketmq"
+	"OpsVault/cmd/elk"
 	"OpsVault/internal/driver"
 	"OpsVault/pkg/dockercli"
 	"OpsVault/pkg/logger"
@@ -90,6 +91,7 @@ func init() {
 	rootCmd.AddCommand(rocketmq.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(rabbitmq.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(postgres.NewCommand(config, dockerFactory))
+	rootCmd.AddCommand(elk.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(newBakCommand(config))
 }
 
@@ -183,6 +185,13 @@ func applyDefaultConfig(v *viper.Viper) {
 	v.SetDefault("nginx.run_group", "www")
 	v.SetDefault("nginx.systemd_unit_path", "/lib/systemd/system/nginx.service")
 	v.SetDefault("nginx.logrotate_path", "/etc/logrotate.d/nginx")
+	v.SetDefault("elk.elasticsearch_image", "elasticsearch:8.12.0")
+	v.SetDefault("elk.elasticsearch_port", 9200)
+	v.SetDefault("elk.kibana_image", "kibana:8.12.0")
+	v.SetDefault("elk.kibana_port", 5601)
+	v.SetDefault("elk.logstash_image", "logstash:8.12.0")
+	v.SetDefault("elk.logstash_port", 5044)
+	v.SetDefault("elk.es_java_opts", "-Xms512m -Xmx512m")
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.storage_path", "/data/opsvault/logs")
 	v.SetDefault("backup.storage_path", "/data/opsvault/bak")

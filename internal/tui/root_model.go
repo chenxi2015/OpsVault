@@ -135,6 +135,7 @@ func NewRootModel(provider ...StatusProvider) RootModel {
 			{Name: "rocketmq"},
 			{Name: "rabbitmq"},
 			{Name: "postgres"},
+			{Name: "elk"},
 		}
 	}
 

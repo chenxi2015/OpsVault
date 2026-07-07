@@ -14,6 +14,7 @@ import (
 
 	"OpsVault/pkg/fileutil"
 	"OpsVault/pkg/logger"
+
 	"github.com/spf13/viper"
 )
 
@@ -69,6 +70,7 @@ func (m *BackupManager) ResolveConfigPaths() map[string]string {
 		"rocketmq": filepath.Join(dataRoot, "rocketmq", "conf"),
 		"rabbitmq": filepath.Join(dataRoot, "rabbitmq", "conf"),
 		"postgres": filepath.Join(dataRoot, "postgres", "conf"),
+		"elk":      filepath.Join(dataRoot, "elk", "conf"),
 	}
 
 	// Add global configuration file if loaded

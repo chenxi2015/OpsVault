@@ -30,6 +30,13 @@ var ConfigKeys = []string{
 	"postgres.image",
 	"postgres.port",
 	"postgres.password",
+	"elk.elasticsearch_image",
+	"elk.elasticsearch_port",
+	"elk.kibana_image",
+	"elk.kibana_port",
+	"elk.logstash_image",
+	"elk.logstash_port",
+	"elk.es_java_opts",
 }
 
 // ConfigWizardView renders the config options list.
