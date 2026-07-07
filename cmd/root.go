@@ -82,6 +82,11 @@ func initConfig() error {
 		config.SetConfigName("default")
 		config.AddConfigPath("./configs")
 		config.AddConfigPath(".")
+		if exePath, err := os.Executable(); err == nil {
+			exeDir := filepath.Dir(exePath)
+			config.AddConfigPath(filepath.Join(exeDir, "configs"))
+			config.AddConfigPath(exeDir)
+		}
 		if home, err := os.UserHomeDir(); err == nil {
 			config.AddConfigPath(filepath.Join(home, ".opsvault"))
 		}

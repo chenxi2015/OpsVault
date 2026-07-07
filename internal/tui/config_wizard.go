@@ -13,10 +13,22 @@ var ConfigKeys = []string{
 	"docker.cidr",
 	"docker.data_root",
 	"mysql.image",
+	"mysql.port",
+	"mysql.root_password",
 	"redis.image",
+	"redis.port",
+	"redis.password",
 	"rocketmq.image",
+	"rocketmq.namesrv_port",
+	"rocketmq.broker_port",
 	"rabbitmq.image",
+	"rabbitmq.port",
+	"rabbitmq.ui_port",
+	"rabbitmq.admin_user",
+	"rabbitmq.admin_pwd",
 	"postgres.image",
+	"postgres.port",
+	"postgres.password",
 }
 
 // ConfigWizardView renders the config options list.

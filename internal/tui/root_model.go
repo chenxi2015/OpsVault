@@ -3,7 +3,10 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -406,7 +409,15 @@ func (m *RootModel) handleInputSubmit() (tea.Model, tea.Cmd) {
 	if strings.HasPrefix(m.textInputState, "config|") {
 		configKey := strings.TrimPrefix(m.textInputState, "config|")
 		if m.config != nil {
-			m.config.Set(configKey, val)
+			if strings.Contains(configKey, "port") {
+				if intVal, err := strconv.Atoi(val); err == nil {
+					m.config.Set(configKey, intVal)
+				} else {
+					m.config.Set(configKey, val)
+				}
+			} else {
+				m.config.Set(configKey, val)
+			}
 		}
 		return m, nil
 	}
@@ -483,7 +494,24 @@ func (m *RootModel) handleShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, func() tea.Msg {
 				var err error
 				if m.config != nil {
-					err = m.config.WriteConfig()
+					if m.config.ConfigFileUsed() != "" {
+						err = m.config.WriteConfig()
+					} else {
+						var targetPath string
+						if exePath, errExe := os.Executable(); errExe == nil {
+							targetPath = filepath.Join(filepath.Dir(exePath), "configs", "default.yaml")
+						} else {
+							targetPath = filepath.Join("configs", "default.yaml")
+						}
+						if errDir := os.MkdirAll(filepath.Dir(targetPath), 0755); errDir == nil {
+							err = m.config.WriteConfigAs(targetPath)
+							if err == nil {
+								m.config.SetConfigFile(targetPath)
+							}
+						} else {
+							err = errDir
+						}
+					}
 				}
 				output := "Configuration successfully saved."
 				if err != nil {
@@ -503,7 +531,8 @@ func (m *RootModel) handleShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var selectedSvc ServiceRef
 	var hasSvc bool
 
-	if m.active == 2 {
+	switch m.active {
+	case 2:
 		dockServices := filterDockerServices(m.services)
 		if len(dockServices) > 0 && m.selectedServiceIndex < len(dockServices) {
 			targetName := dockServices[m.selectedServiceIndex].Name
@@ -512,14 +541,14 @@ func (m *RootModel) handleShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				hasSvc = true
 			}
 		}
-	} else if m.active == 1 {
+	case 1:
 		if m.selectedNginxSubMode == 0 {
 			if reg := m.findRegistry("nginx"); reg != nil {
 				selectedSvc = *reg
 				hasSvc = true
 			}
 		}
-	} else if m.active == 0 {
+	case 0:
 		if len(m.registry) > 0 && m.selectedServiceIndex < len(m.registry) {
 			selectedSvc = m.registry[m.selectedServiceIndex]
 			hasSvc = true
