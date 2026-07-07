@@ -18,9 +18,14 @@ func NginxPanelView(m RootModel) string {
 
 	subModes := []string{"Service", "VHosts", "Certificates"}
 	for idx, mode := range subModes {
-		if m.focus == focusSidebar && idx == m.selectedNginxSubMode {
-			selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("10"))
-			sidebarLines = append(sidebarLines, selectedStyle.Render("> "+mode))
+		if idx == m.selectedNginxSubMode {
+			if m.focus == focusSidebar {
+				selectedStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("10"))
+				sidebarLines = append(sidebarLines, selectedStyle.Render("> "+mode))
+			} else {
+				activeStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+				sidebarLines = append(sidebarLines, activeStyle.Render("* "+mode))
+			}
 		} else {
 			sidebarLines = append(sidebarLines, "  "+mode)
 		}
@@ -65,6 +70,13 @@ func NginxPanelView(m RootModel) string {
 			}
 		}
 
+		var focusHint string
+		if m.focus == focusSidebar {
+			focusHint = fmt.Sprintf("  [%s] Enter Right Panel", lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("Tab/Enter"))
+		} else {
+			focusHint = fmt.Sprintf("  [%s] Back to Sidebar", lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("Tab/Esc"))
+		}
+
 		detailLines = append(detailLines,
 			lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("14")).Render("NGINX BINARY SERVICE"),
 			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("--------------------------------------"),
@@ -87,6 +99,7 @@ func NginxPanelView(m RootModel) string {
 				lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("d"),
 				lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("u"),
 			),
+			focusHint,
 		)
 
 	case "VHosts":
@@ -103,9 +116,14 @@ func NginxPanelView(m RootModel) string {
 				domain := strings.TrimSuffix(vh["domain"], ".conf")
 				prefix := "  "
 				rowStyle := lipgloss.NewStyle()
-				if m.focus == focusDetail && idx == m.selectedVHostIndex {
-					prefix = "> "
-					rowStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10"))
+				if idx == m.selectedVHostIndex {
+					if m.focus == focusDetail {
+						prefix = "> "
+						rowStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10"))
+					} else {
+						prefix = "- "
+						rowStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+					}
 					selectedPath = vh["path"]
 				}
 				detailLines = append(detailLines, prefix+rowStyle.Render(domain))
@@ -118,12 +136,20 @@ func NginxPanelView(m RootModel) string {
 			detailLines = append(detailLines, pathStyle.Render(fmt.Sprintf("Config: %s", selectedPath)), "")
 		}
 
+		var focusHint string
+		if m.focus == focusSidebar {
+			focusHint = fmt.Sprintf("  [%s] Enter Right Panel to Select", lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("Tab/Enter"))
+		} else {
+			focusHint = fmt.Sprintf("  [%s] Back to Sidebar", lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("Tab/Esc"))
+		}
+
 		detailLines = append(detailLines,
 			"Commands:",
 			fmt.Sprintf("  [%s] Add Virtual Host   [%s] Delete Selected",
 				lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("a"),
 				lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("d"),
 			),
+			focusHint,
 		)
 
 	case "Certificates":
@@ -154,10 +180,16 @@ func NginxPanelView(m RootModel) string {
 
 				prefix := "  "
 				rowStyle := lipgloss.NewStyle()
-				if m.focus == focusDetail && idx == m.selectedCertIndex {
-					prefix = "> "
-					rowStyle = lipgloss.NewStyle().Bold(true)
-					selectedCertPath = certPath
+				if idx == m.selectedCertIndex {
+					if m.focus == focusDetail {
+						prefix = "> "
+						rowStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10"))
+						selectedCertPath = certPath
+					} else {
+						prefix = "- "
+						rowStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+						selectedCertPath = certPath
+					}
 				}
 				detailLines = append(detailLines, fmt.Sprintf("%s%s (%s)", prefix, rowStyle.Render(domain), sslStyle.Render(sslStatus)))
 			}
@@ -169,6 +201,13 @@ func NginxPanelView(m RootModel) string {
 			}
 		}
 
+		var focusHint string
+		if m.focus == focusSidebar {
+			focusHint = fmt.Sprintf("  [%s] Enter Right Panel to Select", lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("Tab/Enter"))
+		} else {
+			focusHint = fmt.Sprintf("  [%s] Back to Sidebar", lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("Tab/Esc"))
+		}
+
 		detailLines = append(detailLines,
 			"Commands:",
 			fmt.Sprintf("  [%s] Apply SSL (Let's Encrypt)  [%s] Renew Selected  [%s] Delete SSL",
@@ -176,13 +215,23 @@ func NginxPanelView(m RootModel) string {
 				lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("r"),
 				lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("d"),
 			),
+			focusHint,
 		)
 	}
 
-	// Joint Layout using columns
+	// Joint Layout using columns with focused borders
+	sidebarBorderColor := "240"
+	detailBorderColor := "240"
+	switch m.focus {
+	case focusSidebar:
+		sidebarBorderColor = "10"
+	case focusDetail:
+		detailBorderColor = "10"
+	}
+
 	sidebarBox := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("240")).
+		BorderForeground(lipgloss.Color(sidebarBorderColor)).
 		Padding(1, 2).
 		Width(26).
 		Height(12).
@@ -190,7 +239,7 @@ func NginxPanelView(m RootModel) string {
 
 	detailBox := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("240")).
+		BorderForeground(lipgloss.Color(detailBorderColor)).
 		Padding(1, 2).
 		Width(48).
 		Height(12).

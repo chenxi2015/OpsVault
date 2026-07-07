@@ -217,7 +217,11 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "down", "j":
 			m.moveSelection(1)
 		case "esc":
-			m.drawerMode = drawerHidden
+			if m.focus == focusDetail {
+				m.focus = focusSidebar
+			} else {
+				m.drawerMode = drawerHidden
+			}
 		}
 
 		// Tab specific shortcuts and commands
@@ -667,21 +671,28 @@ func (m *RootModel) handleShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if actionID == "" {
-		if msg.String() == "enter" && m.active == 0 {
-			if selectedSvc.Name == "nginx" {
-				m.active = 1
-			} else {
-				m.active = 2
-				dockServices := filterDockerServices(m.services)
-				for idx, ds := range dockServices {
-					if ds.Name == selectedSvc.Name {
-						m.selectedServiceIndex = idx
-						break
+		if msg.String() == "enter" {
+			if m.active == 0 {
+				if selectedSvc.Name == "nginx" {
+					m.active = 1
+				} else {
+					m.active = 2
+					dockServices := filterDockerServices(m.services)
+					for idx, ds := range dockServices {
+						if ds.Name == selectedSvc.Name {
+							m.selectedServiceIndex = idx
+							break
+						}
 					}
 				}
+				m.focus = focusSidebar
+				return m, nil
+			} else if m.active == 1 {
+				if m.focus == focusSidebar {
+					m.focus = focusDetail
+					return m, nil
+				}
 			}
-			m.focus = focusSidebar
-			return m, nil
 		}
 		return m, nil
 	}
