@@ -140,6 +140,27 @@ func (d *NginxDriver) Status() (*driver.ServiceStatus, error) {
 	return status, nil
 }
 
+// getVHostDir returns the configured virtual host directory or defaults to {install_path}/conf/vhost
+func (d *NginxDriver) getVHostDir() string {
+	vhostDir := nginxConfigString(d.Config, "nginx.vhost_dir")
+	if vhostDir != "" {
+		return vhostDir
+	}
+	return filepath.Join(nginxConfigString(d.Config, "nginx.install_path"), "conf", "vhost")
+}
+
+// reloadNginxSafe reloads the Nginx service if it is running on Linux, preventing exit status errors.
+func (d *NginxDriver) reloadNginxSafe() error {
+	if !d.isLinuxOrTest() {
+		return nil
+	}
+	pid, _ := system.FindPID("nginx")
+	if pid <= 0 {
+		return nil
+	}
+	return system.ReloadService("nginx")
+}
+
 func (d *NginxDriver) AddVHost(domain, root string) error {
 	if domain == "" || root == "" {
 		return fmt.Errorf("domain and root are required")
@@ -147,7 +168,7 @@ func (d *NginxDriver) AddVHost(domain, root string) error {
 	if err := fileutil.EnsureDir(root, 0o755); err != nil {
 		return err
 	}
-	confPath := filepath.Join(nginxConfigString(d.Config, "nginx.install_path"), "conf", "vhost", domain+".conf")
+	confPath := filepath.Join(d.getVHostDir(), domain+".conf")
 	if err := fileutil.EnsureDir(filepath.Dir(confPath), 0o755); err != nil {
 		return err
 	}
@@ -155,14 +176,14 @@ func (d *NginxDriver) AddVHost(domain, root string) error {
 	if err := os.WriteFile(confPath, []byte(conf), 0o644); err != nil {
 		return err
 	}
-	return reloadNginx()
+	return d.reloadNginxSafe()
 }
 
 func (d *NginxDriver) DeleteVHost(domain string, deleteRoot bool) error {
 	if domain == "" {
 		return fmt.Errorf("domain is required")
 	}
-	confPath := filepath.Join(nginxConfigString(d.Config, "nginx.install_path"), "conf", "vhost", domain+".conf")
+	confPath := filepath.Join(d.getVHostDir(), domain+".conf")
 	if err := os.Remove(confPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -172,11 +193,11 @@ func (d *NginxDriver) DeleteVHost(domain string, deleteRoot bool) error {
 			return err
 		}
 	}
-	return reloadNginx()
+	return d.reloadNginxSafe()
 }
 
 func (d *NginxDriver) ListVHosts() ([]map[string]string, error) {
-	vhostDir := filepath.Join(nginxConfigString(d.Config, "nginx.install_path"), "conf", "vhost")
+	vhostDir := d.getVHostDir()
 	entries, err := os.ReadDir(vhostDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -187,6 +208,9 @@ func (d *NginxDriver) ListVHosts() ([]map[string]string, error) {
 	var result []map[string]string
 	for _, entry := range entries {
 		if entry.IsDir() {
+			continue
+		}
+		if !strings.HasSuffix(entry.Name(), ".conf") {
 			continue
 		}
 		// Strip the .conf extension to get the clean domain name
@@ -216,7 +240,7 @@ func (d *NginxDriver) EnableSSL(domain string) error {
 	if err := os.WriteFile(confPath, []byte(conf), 0o644); err != nil {
 		return err
 	}
-	return reloadNginx()
+	return d.reloadNginxSafe()
 }
 
 func (d *NginxDriver) DisableSSL(domain string) error {
@@ -232,11 +256,11 @@ func (d *NginxDriver) DisableSSL(domain string) error {
 	if err := os.WriteFile(confPath, []byte(renderHTTPVHost(domain, root)), 0o644); err != nil {
 		return err
 	}
-	return reloadNginx()
+	return d.reloadNginxSafe()
 }
 
 func (d *NginxDriver) vhostConfPath(domain string) string {
-	return filepath.Join(nginxConfigString(d.Config, "nginx.install_path"), "conf", "vhost", domain+".conf")
+	return filepath.Join(d.getVHostDir(), domain+".conf")
 }
 
 func nginxConfigString(cfg *viper.Viper, key string) string {
@@ -249,6 +273,8 @@ func nginxConfigString(cfg *viper.Viper, key string) string {
 		return configString(cfg, key, "/data/ssl")
 	case "nginx.wwwlogs_root":
 		return configString(cfg, key, "/data/wwwlogs")
+	case "nginx.vhost_dir":
+		return configString(cfg, key, "")
 	default:
 		return configString(cfg, key, "")
 	}

@@ -71,9 +71,9 @@ func DashboardView(m RootModel) string {
 
 	lines = append(lines, "")
 	if m.focus == focusSidebar {
-		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("Press Up/Down to navigate, Enter to manage service, h/l to switch tabs."))
+		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("Press Up/Down to navigate, Enter to manage service, left/right arrow to switch tabs."))
 	} else {
-		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("Press Tab to change focus, h/l to switch tabs."))
+		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("Press Tab to change focus, left/right arrow to switch tabs."))
 	}
 
 	// Action shortcuts hint

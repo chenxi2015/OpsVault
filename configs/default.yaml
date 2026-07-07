@@ -28,6 +28,7 @@ nginx:
     ssl_root: /data/ssl  # SSL 证书存储目录
     systemd_unit_path: /lib/systemd/system/nginx.service  # Nginx systemd 服务文件路径
     version: 1.31.0  # 准备编译的 Nginx 版本
+    vhost_dir: ""  # Directory for virtual hosts configurations. If empty, defaults to {install_path}/conf/vhost.
     www_root: /data/wwwroot  # 网站根目录
     wwwlogs_root: /data/wwwlogs  # Nginx 访问与错误日志目录
 postgres:

@@ -194,7 +194,7 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "tab":
 			m.cycleFocus()
-		case "left", "h":
+		case "left":
 			if m.active > 0 {
 				m.active--
 				m.resetSubNavigation()
@@ -203,7 +203,7 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.runDiagnosticsCmd()
 				}
 			}
-		case "right", "l":
+		case "right":
 			if m.active < len(m.tabs)-1 {
 				m.active++
 				m.resetSubNavigation()

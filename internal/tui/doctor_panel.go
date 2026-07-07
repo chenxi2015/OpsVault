@@ -67,7 +67,7 @@ func DoctorPanelView(m RootModel) string {
 	if m.doctorRunning {
 		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("  ⏳ 正在刷新环境信息..."))
 	} else {
-		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("  Press [r] to re-run diagnostics. h/l to switch tabs."))
+		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("  Press [r] to re-run diagnostics. left/right arrow to switch tabs."))
 	}
 
 	return strings.Join(lines, "\n")
