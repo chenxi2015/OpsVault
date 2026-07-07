@@ -189,8 +189,10 @@ func (d *NginxDriver) ListVHosts() ([]map[string]string, error) {
 		if entry.IsDir() {
 			continue
 		}
+		// Strip the .conf extension to get the clean domain name
+		domain := strings.TrimSuffix(entry.Name(), ".conf")
 		result = append(result, map[string]string{
-			"domain": entry.Name(),
+			"domain": domain,
 			"path":   filepath.Join(vhostDir, entry.Name()),
 		})
 	}

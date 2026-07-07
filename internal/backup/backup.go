@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -153,22 +154,30 @@ func (m *BackupManager) CreateBackup(services []string, customName, description 
 	defer file.Close()
 
 	gw := gzip.NewWriter(file)
-	defer gw.Close()
-
 	tw := tar.NewWriter(gw)
-	defer tw.Close()
 
 	for _, t := range activeTargets {
 		path := resolvedPaths[t]
 		err := m.addPathToTar(tw, path, t)
 		if err != nil {
+			// Clean up on failure
+			_ = tw.Close()
+			_ = gw.Close()
+			_ = os.Remove(tarGzPath)
 			return nil, fmt.Errorf("add path %s to archive: %w", path, err)
 		}
 	}
 
-	// Close archive writers so size is updated
-	_ = tw.Close()
-	_ = gw.Close()
+	// Close archive writers explicitly so all data is flushed
+	if err := tw.Close(); err != nil {
+		_ = gw.Close()
+		_ = os.Remove(tarGzPath)
+		return nil, fmt.Errorf("finalize tar archive: %w", err)
+	}
+	if err := gw.Close(); err != nil {
+		_ = os.Remove(tarGzPath)
+		return nil, fmt.Errorf("finalize gzip stream: %w", err)
+	}
 
 	fi, err := file.Stat()
 	if err != nil {
@@ -227,14 +236,10 @@ func (m *BackupManager) ListBackups() ([]*BackupMetadata, error) {
 		}
 	}
 
-	// Sort backups by timestamp descending
-	for i := 0; i < len(backups); i++ {
-		for j := i + 1; j < len(backups); j++ {
-			if backups[i].Timestamp.Before(backups[j].Timestamp) {
-				backups[i], backups[j] = backups[j], backups[i]
-			}
-		}
-	}
+	// Sort backups by timestamp descending (newest first)
+	sort.Slice(backups, func(i, j int) bool {
+		return backups[i].Timestamp.After(backups[j].Timestamp)
+	})
 
 	return backups, nil
 }

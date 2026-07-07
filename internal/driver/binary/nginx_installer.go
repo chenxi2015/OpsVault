@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -44,8 +45,8 @@ var runNginxCommand = func(dir, name string, args ...string) ([]byte, error) {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
 	var buf bytes.Buffer
-	cmd.Stdout = io.MultiWriter(os.Stdout, &buf)
-	cmd.Stderr = io.MultiWriter(os.Stderr, &buf)
+	cmd.Stdout = io.MultiWriter(log.Writer(), &buf)
+	cmd.Stderr = io.MultiWriter(log.Writer(), &buf)
 	err := cmd.Run()
 	return buf.Bytes(), err
 }
@@ -236,6 +237,16 @@ func (i *nginxInstaller) extractSources() error {
 }
 
 func (i *nginxInstaller) compileAndInstall() error {
+	nginxBin := filepath.Join(i.plan.installPath, "sbin", "nginx")
+	backupBin := nginxBin + ".bak"
+
+	// Back up existing binary before recompiling so we can roll back on failure
+	if _, err := os.Stat(nginxBin); err == nil {
+		if err := copyFile(nginxBin, backupBin); err != nil {
+			return fmt.Errorf("backup existing nginx binary: %w", err)
+		}
+	}
+
 	gccAuto := filepath.Join(i.plan.nginxSourceDir(), "auto", "cc", "gcc")
 	if data, err := os.ReadFile(gccAuto); err == nil {
 		updated := strings.ReplaceAll(string(data), `CFLAGS="$CFLAGS -g"`, `#CFLAGS="$CFLAGS -g"`)
@@ -245,20 +256,47 @@ func (i *nginxInstaller) compileAndInstall() error {
 	}
 	output, err := runNginxCommand(i.plan.nginxSourceDir(), "./configure", i.plan.configureArgs()...)
 	if err != nil {
+		_ = restoreBackup(nginxBin, backupBin)
 		return fmt.Errorf("configure nginx: %w: %s", err, string(output))
 	}
 	output, err = runNginxCommand(i.plan.nginxSourceDir(), "make", "-j", fmt.Sprintf("%d", i.plan.jobs))
 	if err != nil {
+		_ = restoreBackup(nginxBin, backupBin)
 		return fmt.Errorf("make nginx: %w: %s", err, string(output))
 	}
 	output, err = runNginxCommand(i.plan.nginxSourceDir(), "make", "install")
 	if err != nil {
+		_ = restoreBackup(nginxBin, backupBin)
 		return fmt.Errorf("make install nginx: %w: %s", err, string(output))
 	}
-	if _, err := os.Stat(filepath.Join(i.plan.installPath, "sbin", "nginx")); err != nil {
+	if _, err := os.Stat(nginxBin); err != nil {
+		_ = restoreBackup(nginxBin, backupBin)
 		return fmt.Errorf("nginx binary not found after install: %w", err)
 	}
+	// New binary is confirmed good — remove the backup
+	_ = os.Remove(backupBin)
 	return nil
+}
+
+// copyFile copies src to dst, preserving file permissions.
+func copyFile(src, dst string) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, info.Mode())
+}
+
+// restoreBackup replaces target with the backup file if backup exists.
+func restoreBackup(target, backup string) error {
+	if _, err := os.Stat(backup); os.IsNotExist(err) {
+		return nil
+	}
+	return os.Rename(backup, target)
 }
 
 func (i *nginxInstaller) writeRuntimeFiles() error {

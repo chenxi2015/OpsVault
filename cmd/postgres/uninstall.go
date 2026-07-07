@@ -1,8 +1,11 @@
 package postgres
 
 import (
+	"fmt"
+
 	"OpsVault/cmd/common"
 	"OpsVault/internal/driver"
+	"OpsVault/pkg/logger"
 
 	"github.com/spf13/cobra"
 )
@@ -17,7 +20,12 @@ func (c *commandSet) newUninstallCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return drv.Uninstall(purge)
+		if err := drv.Uninstall(purge); err != nil {
+				logger.AuditLog("postgres", "uninstall", fmt.Sprintf("purge=%v", purge), false)
+				return err
+			}
+			logger.AuditLog("postgres", "uninstall", fmt.Sprintf("purge=%v", purge), true)
+			return nil
 	}}
 	cmd.Flags().BoolVar(&purge, "purge", false, "delete data directory")
 	return cmd

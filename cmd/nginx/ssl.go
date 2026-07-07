@@ -9,7 +9,7 @@ func (c *commandSet) newSSLCommand() *cobra.Command {
 		Use:   "ssl",
 		Short: "Manage SSL certificates",
 	}
-	cmd.AddCommand(c.newSSLApplyCommand(), c.newSSLRenewCommand(), c.newSSLDeleteCommand())
+	cmd.AddCommand(c.newSSLApplyCommand(), c.newSSLRenewCommand(), c.newSSLDeleteCommand(), newSSLCronCommand(""))
 	return cmd
 }
 

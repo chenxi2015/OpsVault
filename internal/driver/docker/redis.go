@@ -68,7 +68,7 @@ func (d *RedisDriver) containerSpec() (*container.Config, *container.HostConfig,
 				filepath.Join(d.DataDir, "conf", "redis.conf") + ":/usr/local/etc/redis/redis.conf",
 			},
 			PortBindings: nat.PortMap{
-				port: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: hostPort}},
+				port: []nat.PortBinding{{HostIP: d.BindIP, HostPort: hostPort}},
 			},
 		}, nil
 }

@@ -39,6 +39,12 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 		logger.Configure(debug)
+		// Initialize audit log to the configured log storage path
+		logDir := config.GetString("log.storage_path")
+		if logDir == "" {
+			logDir = "/data/opsvault/logs"
+		}
+		logger.ConfigureAudit(logDir)
 		return nil
 	},
 }
@@ -56,8 +62,12 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file path")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
 	rootCmd.PersistentFlags().String("mode", string(driver.ModeDocker), "driver mode: docker|binary")
+	rootCmd.PersistentFlags().String("bind-ip", "", "Docker port bind address: 0.0.0.0 (all interfaces) or 127.0.0.1 (localhost only)")
 
 	if err := config.BindPFlag("mode", rootCmd.PersistentFlags().Lookup("mode")); err != nil {
+		panic(err)
+	}
+	if err := config.BindPFlag("docker.bind_ip", rootCmd.PersistentFlags().Lookup("bind-ip")); err != nil {
 		panic(err)
 	}
 
@@ -125,6 +135,7 @@ func applyDefaultConfig(v *viper.Viper) {
 	v.SetDefault("docker.network_name", "opsvault-net")
 	v.SetDefault("docker.cidr", "172.28.0.0/16")
 	v.SetDefault("docker.data_root", "/data/opsvault")
+	v.SetDefault("docker.bind_ip", "0.0.0.0")
 	v.SetDefault("docker.resource_limit.cpu_max", "2")
 	v.SetDefault("docker.resource_limit.mem_max", "2g")
 

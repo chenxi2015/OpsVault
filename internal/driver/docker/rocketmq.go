@@ -78,8 +78,8 @@ exec sh mqbroker -n 127.0.0.1:9876 -c /home/rocketmq/rocketmq-opsvault.conf
 				filepath.Join(d.DataDir, "conf", "broker.conf") + ":/home/rocketmq/rocketmq-opsvault.conf",
 			},
 			PortBindings: nat.PortMap{
-				portNameSrv: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: namesrvPort}},
-				portBroker:  []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: brokerPort}},
+				portNameSrv: []nat.PortBinding{{HostIP: d.BindIP, HostPort: namesrvPort}},
+				portBroker:  []nat.PortBinding{{HostIP: d.BindIP, HostPort: brokerPort}},
 			},
 		}, nil
 }

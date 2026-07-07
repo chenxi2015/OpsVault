@@ -83,8 +83,8 @@ func (d *RabbitMQDriver) containerSpec() (*container.Config, *container.HostConf
 				filepath.Join(d.DataDir, "conf", "rabbitmq.conf") + ":/etc/rabbitmq/rabbitmq.conf",
 			},
 			PortBindings: nat.PortMap{
-				portAMQP: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: hostPort}},
-				portUI:   []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: hostUIPort}},
+				portAMQP: []nat.PortBinding{{HostIP: d.BindIP, HostPort: hostPort}},
+				portUI:   []nat.PortBinding{{HostIP: d.BindIP, HostPort: hostUIPort}},
 			},
 		}, nil
 }

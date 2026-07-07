@@ -37,6 +37,7 @@ type BaseDriver struct {
 	DataDir        string
 	Ports          []string
 	NetworkName    string
+	BindIP         string
 	PollInterval   time.Duration
 	StartupTimeout time.Duration
 
@@ -46,6 +47,10 @@ type BaseDriver struct {
 
 func NewBaseDriver(name string, cli *client.Client, cfg *viper.Viper, image string, ports []string) *BaseDriver {
 	dataRoot := cfg.GetString("docker.data_root")
+	bindIP := cfg.GetString("docker.bind_ip")
+	if bindIP == "" {
+		bindIP = "0.0.0.0"
+	}
 	driver := &BaseDriver{
 		Name:           name,
 		Client:         cli,
@@ -55,6 +60,7 @@ func NewBaseDriver(name string, cli *client.Client, cfg *viper.Viper, image stri
 		DataDir:        filepath.Join(dataRoot, name),
 		Ports:          ports,
 		NetworkName:    cfg.GetString("docker.network_name"),
+		BindIP:         bindIP,
 		PollInterval:   2 * time.Second,
 		StartupTimeout: 2 * time.Minute,
 	}
@@ -83,7 +89,13 @@ func (d *BaseDriver) checkAndInstallDocker() error {
 		}
 
 		logger.Infof("Docker is not installed. Triggering auto-installation...")
-		scriptPath := "./scripts/install_docker.sh"
+		exePath, exeErr := os.Executable()
+		var scriptPath string
+		if exeErr == nil {
+			scriptPath = filepath.Join(filepath.Dir(exePath), "scripts", "install_docker.sh")
+		} else {
+			scriptPath = filepath.Join("scripts", "install_docker.sh")
+		}
 		cmd := exec.Command("bash", scriptPath)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -414,7 +426,7 @@ func collectPullProgress(reader io.ReadCloser) (string, error) {
 		}
 
 		if msg != lastPrint {
-			fmt.Println(msg)
+			logger.Infof("docker pull: %s", msg)
 			lastPrint = msg
 		}
 	}

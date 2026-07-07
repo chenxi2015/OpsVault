@@ -63,7 +63,7 @@ func (d *MySQLDriver) containerSpec() (*container.Config, *container.HostConfig,
 				filepath.Join(d.DataDir, "conf", "my.cnf") + ":/etc/mysql/conf.d/my.cnf",
 			},
 			PortBindings: nat.PortMap{
-				port: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: hostPort}},
+				port: []nat.PortBinding{{HostIP: d.BindIP, HostPort: hostPort}},
 			},
 		}, nil
 }

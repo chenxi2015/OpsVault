@@ -68,6 +68,10 @@ type doctorFinishedMsg struct {
 	err   error
 }
 
+type LogLineMsg struct {
+	Line string
+}
+
 type RootModel struct {
 	active               int
 	tabs                 []string
@@ -257,6 +261,16 @@ func (m *RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Refresh statuses immediately after a task finishes
 		return m, m.loadStatuses()
+
+	case LogLineMsg:
+		if m.drawerMode == drawerTasks {
+			m.drawerContent += "\n" + msg.Line
+			lines := strings.Split(m.drawerContent, "\n")
+			if len(lines) > 50 {
+				m.drawerContent = strings.Join(lines[len(lines)-50:], "\n")
+			}
+		}
+		return m, nil
 	}
 	return m, nil
 }
@@ -558,7 +572,8 @@ func (m *RootModel) handleShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if !hasSvc {
 		// Handle Nginx VHosts and Certificates sub-mode special shortcuts
 		if m.active == 1 {
-			if m.selectedNginxSubMode == 1 { // VHosts Mode
+			switch m.selectedNginxSubMode {
+			case 1: // VHosts Mode
 				switch msg.String() {
 				case "a": // Add vhost
 					m.editing = true
@@ -581,7 +596,7 @@ func (m *RootModel) handleShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						return m, nil
 					}
 				}
-			} else if m.selectedNginxSubMode == 2 { // Certificates Mode
+			case 2: // Certificates Mode
 				switch msg.String() {
 				case "a": // Apply SSL
 					m.editing = true
@@ -752,7 +767,8 @@ func filterDockerServices(services []driver.ServiceStatus) []driver.ServiceStatu
 }
 
 func (m *RootModel) moveSelection(dir int) {
-	if m.focus == focusSidebar {
+	switch m.focus {
+	case focusSidebar:
 		switch m.active {
 		case 0, 2:
 			listLen := len(m.registry) - 1 // Excluding nginx
@@ -787,7 +803,7 @@ func (m *RootModel) moveSelection(dir int) {
 				m.selectedServiceIndex = 0
 			}
 		}
-	} else if m.focus == focusDetail {
+	case focusDetail:
 		if m.active == 1 {
 			if m.selectedNginxSubMode == 1 && len(m.nginxVHosts) > 0 {
 				m.selectedVHostIndex += dir

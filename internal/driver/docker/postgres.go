@@ -54,7 +54,7 @@ func (d *PostgresDriver) containerSpec() (*container.Config, *container.HostConf
 		}, &container.HostConfig{
 			Binds: []string{filepath.Join(d.DataDir, "data") + ":/var/lib/postgresql/data"},
 			PortBindings: nat.PortMap{
-				port: []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: hostPort}},
+				port: []nat.PortBinding{{HostIP: d.BindIP, HostPort: hostPort}},
 			},
 		}, nil
 }

@@ -26,6 +26,7 @@ func NewCommand(cfg *viper.Viper, dockerFactory func() (*client.Client, error)) 
 		c.newVersionCommand(),
 		c.newDLQCommand(),
 		c.newLogCommand(),
+		c.newShCommand(),
 	)
 	return cmd
 }
