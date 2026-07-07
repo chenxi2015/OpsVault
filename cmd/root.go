@@ -63,6 +63,7 @@ func init() {
 
 	rootCmd.AddCommand(newTUICommand())
 	rootCmd.AddCommand(newDoctorCommand(config, dockerFactory))
+	rootCmd.AddCommand(newInitCommand(config, dockerFactory))
 	rootCmd.AddCommand(nginx.NewCommand(config))
 	rootCmd.AddCommand(mysql.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(redis.NewCommand(config, dockerFactory))
