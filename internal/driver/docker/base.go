@@ -378,6 +378,7 @@ func collectPullProgress(reader io.ReadCloser) (string, error) {
 
 	decoder := json.NewDecoder(reader)
 	last := ""
+	lastPrint := ""
 	for {
 		var event pullStatus
 		if err := decoder.Decode(&event); err != nil {
@@ -389,6 +390,8 @@ func collectPullProgress(reader io.ReadCloser) (string, error) {
 		if event.Error != "" {
 			return last, fmt.Errorf("image pull failed: %s", event.Error)
 		}
+
+		// Keep original last summary string format for test compliance
 		switch {
 		case event.ID != "" && event.Status != "":
 			last = fmt.Sprintf("%s: %s", event.ID, event.Status)
@@ -396,6 +399,23 @@ func collectPullProgress(reader io.ReadCloser) (string, error) {
 			last = fmt.Sprintf("%s %s", event.Status, event.Progress)
 		case event.Status != "":
 			last = event.Status
+		}
+
+		var msg string
+		switch {
+		case event.ID != "" && event.Progress != "":
+			msg = fmt.Sprintf("  -> [%s] %s %s", event.ID, event.Status, event.Progress)
+		case event.ID != "":
+			msg = fmt.Sprintf("  -> [%s] %s", event.ID, event.Status)
+		case event.Progress != "":
+			msg = fmt.Sprintf("  -> %s %s", event.Status, event.Progress)
+		default:
+			msg = fmt.Sprintf("  -> %s", event.Status)
+		}
+
+		if msg != lastPrint {
+			fmt.Println(msg)
+			lastPrint = msg
 		}
 	}
 }

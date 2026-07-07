@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -42,7 +43,11 @@ type nginxInstaller struct {
 var runNginxCommand = func(dir, name string, args ...string) ([]byte, error) {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
-	return cmd.CombinedOutput()
+	var buf bytes.Buffer
+	cmd.Stdout = io.MultiWriter(os.Stdout, &buf)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &buf)
+	err := cmd.Run()
+	return buf.Bytes(), err
 }
 
 func newNginxInstaller(cfg *viper.Viper) *nginxInstaller {
