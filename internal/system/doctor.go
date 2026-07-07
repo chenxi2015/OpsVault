@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -58,7 +59,7 @@ func RunDiagnostics(ctx context.Context, config *viper.Viper, dockerCli *client.
 	}
 
 	// 6. Port Availability Check
-	items = append(items, checkPorts())
+	items = append(items, checkPorts(config))
 
 	// 7. Nginx Compilation Tools Check
 	items = append(items, checkCompilationTools())
@@ -257,32 +258,137 @@ func checkDockerNetwork(ctx context.Context, config *viper.Viper, cli *client.Cl
 	return item
 }
 
-func checkPorts() DiagnosticItem {
+func checkPorts(config *viper.Viper) DiagnosticItem {
 	item := DiagnosticItem{Name: "关键运维端口占用"}
-	// Port list and descriptions
-	ports := map[int]string{
-		80:    "Nginx HTTP",
-		443:   "Nginx HTTPS",
-		3306:  "MySQL 数据库",
-		6379:  "Redis 缓存",
-		9876:  "RocketMQ NameServer",
-		15672: "RabbitMQ Web 控制台",
+
+	type PortInfo struct {
+		Service   string
+		ConfigKey string
+		Default   int
 	}
 
-	var occupied []string
-	for port, desc := range ports {
-		if err := CheckPortAvailable(port); err != nil {
-			occupied = append(occupied, fmt.Sprintf("%d (%s)", port, desc))
+	portsToCheck := []PortInfo{
+		{Service: "Nginx HTTP", ConfigKey: "nginx (默认)", Default: 80},
+		{Service: "Nginx HTTPS", ConfigKey: "nginx (默认)", Default: 443},
+		{Service: "MySQL 数据库", ConfigKey: "mysql.port", Default: 3306},
+		{Service: "Redis 缓存", ConfigKey: "redis.port", Default: 6379},
+		{Service: "RocketMQ NameServer", ConfigKey: "rocketmq.namesrv_port", Default: 9876},
+		{Service: "RocketMQ Broker", ConfigKey: "rocketmq.broker_port", Default: 10911},
+		{Service: "RabbitMQ 消息队列", ConfigKey: "rabbitmq.port", Default: 5672},
+		{Service: "RabbitMQ Web 控制台", ConfigKey: "rabbitmq.ui_port", Default: 15672},
+		{Service: "PostgreSQL 数据库", ConfigKey: "postgres.port", Default: 5432},
+	}
+
+	type Row struct {
+		Service    string
+		ConfigPort int
+		ConfigKey  string
+		Status     string
+		Occupant   string
+	}
+
+	var rows []Row
+	hasOccupied := false
+	var occupiedNames []string
+
+	for _, pt := range portsToCheck {
+		port := pt.Default
+		configKeyDisplay := pt.ConfigKey
+		if config != nil && pt.ConfigKey != "nginx (默认)" {
+			if val := config.GetInt(pt.ConfigKey); val != 0 {
+				port = val
+			}
 		}
+
+		statusStr := "未使用"
+		occupantStr := "-"
+
+		if err := CheckPortAvailable(port); err != nil {
+			statusStr = "已占用"
+			hasOccupied = true
+			occupiedNames = append(occupiedNames, fmt.Sprintf("%d (%s)", port, pt.Service))
+
+			// Try to find the process occupying the port
+			if pid, procName, err := GetPortOccupant(port); err == nil {
+				occupantStr = fmt.Sprintf("%d/%s", pid, procName)
+			} else {
+				occupantStr = "未知进程"
+			}
+		}
+
+		rows = append(rows, Row{
+			Service:    pt.Service,
+			ConfigPort: port,
+			ConfigKey:  configKeyDisplay,
+			Status:     statusStr,
+			Occupant:   occupantStr,
+		})
 	}
 
-	if len(occupied) > 0 {
+	// Build tabular output
+	var tableLines []string
+	col1Width := 20 // 服务名称
+	col2Width := 8  // 配置端口
+	col3Width := 22 // 配置来源
+	col4Width := 10 // 当前状态
+	col5Width := 18 // 占用进程
+
+	// Top border
+	tableLines = append(tableLines, fmt.Sprintf("+%s+%s+%s+%s+%s+",
+		strings.Repeat("-", col1Width+2),
+		strings.Repeat("-", col2Width+2),
+		strings.Repeat("-", col3Width+2),
+		strings.Repeat("-", col4Width+2),
+		strings.Repeat("-", col5Width+2),
+	))
+
+	// Headers
+	tableLines = append(tableLines, fmt.Sprintf("| %s | %s | %s | %s | %s |",
+		padRight("服务名称", col1Width),
+		padRight("配置端口", col2Width),
+		padRight("配置来源 (YAML)", col3Width),
+		padRight("当前状态", col4Width),
+		padRight("占用进程", col5Width),
+	))
+
+	// Separator
+	tableLines = append(tableLines, fmt.Sprintf("+%s+%s+%s+%s+%s+",
+		strings.Repeat("-", col1Width+2),
+		strings.Repeat("-", col2Width+2),
+		strings.Repeat("-", col3Width+2),
+		strings.Repeat("-", col4Width+2),
+		strings.Repeat("-", col5Width+2),
+	))
+
+	// Row data
+	for _, r := range rows {
+		tableLines = append(tableLines, fmt.Sprintf("| %s | %s | %s | %s | %s |",
+			padRight(r.Service, col1Width),
+			padRight(strconv.Itoa(r.ConfigPort), col2Width),
+			padRight(r.ConfigKey, col3Width),
+			padRight(r.Status, col4Width),
+			padRight(r.Occupant, col5Width),
+		))
+	}
+
+	// Bottom border
+	tableLines = append(tableLines, fmt.Sprintf("+%s+%s+%s+%s+%s+",
+		strings.Repeat("-", col1Width+2),
+		strings.Repeat("-", col2Width+2),
+		strings.Repeat("-", col3Width+2),
+		strings.Repeat("-", col4Width+2),
+		strings.Repeat("-", col5Width+2),
+	))
+
+	tableStr := "\n" + strings.Join(tableLines, "\n")
+
+	if hasOccupied {
 		item.Status = StatusFail
-		item.Message = fmt.Sprintf("以下关键端口已被占用: %s", strings.Join(occupied, ", "))
+		item.Message = fmt.Sprintf("以下关键端口已被占用: %s%s", strings.Join(occupiedNames, ", "), tableStr)
 		item.Suggestion = "请停止占用这些端口的本地服务，或者修改 configs/default.yaml 中对应组件的端口绑定配置。"
 	} else {
 		item.Status = StatusOk
-		item.Message = "关键端口未被占用 (80, 443, 3306, 6379, 9876, 15672)"
+		item.Message = "关键端口未被占用" + tableStr
 	}
 	return item
 }
@@ -352,4 +458,24 @@ func checkFileLimits() DiagnosticItem {
 	}
 
 	return item
+}
+
+func visualWidth(s string) int {
+	w := 0
+	for _, r := range s {
+		if r > 127 {
+			w += 2
+		} else {
+			w += 1
+		}
+	}
+	return w
+}
+
+func padRight(s string, target int) string {
+	w := visualWidth(s)
+	if w >= target {
+		return s
+	}
+	return s + strings.Repeat(" ", target-w)
 }

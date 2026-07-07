@@ -44,8 +44,18 @@ func DoctorPanelView(m RootModel) string {
 			statusColored = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("9")).Render("[ FAIL ]")
 		}
 
-		lineContent := fmt.Sprintf("  %-25s  %-10s  %-40s", item.Name, statusColored, item.Message)
+		// Handle multi-line messages (like tables) to align properly under the Message column
+		msgLines := strings.Split(item.Message, "\n")
+		lineContent := fmt.Sprintf("  %-25s  %-10s  %-40s", item.Name, statusColored, msgLines[0])
 		lines = append(lines, lineContent)
+
+		if len(msgLines) > 1 {
+			// 2 (indent) + 25 (name width) + 2 (spaces) + 10 (status width) + 2 (spaces) = 41 spaces
+			indentPrefix := strings.Repeat(" ", 41)
+			for i := 1; i < len(msgLines); i++ {
+				lines = append(lines, indentPrefix+msgLines[i])
+			}
+		}
 
 		if item.Suggestion != "" && item.Status != system.StatusOk {
 			suggestionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
