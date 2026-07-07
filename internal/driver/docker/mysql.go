@@ -31,7 +31,7 @@ func NewMySQLDriver(cli DockerClient, cfg *viper.Viper, rootPassword string) *My
 	if rootPassword == "" {
 		rootPassword = "root"
 	}
-	base := NewBaseDriver("mysql", cli.Raw(), cfg, image, []string{fmt.Sprintf("%d:%d", port, port)})
+	base := NewBaseDriver("mysql", cli.Raw(), cfg, image, []string{fmt.Sprintf("%d:3306", port)})
 	drv := &MySQLDriver{BaseDriver: base, rootPassword: rootPassword}
 	drv.PrepareConfig = drv.prepareConfig
 	return drv

@@ -27,7 +27,7 @@ func NewPostgresDriver(cli DockerClient, cfg *viper.Viper, password string) *Pos
 	if password == "" {
 		password = cfg.GetString("postgres.password")
 	}
-	base := NewBaseDriver("postgres", cli.Raw(), cfg, image, []string{fmt.Sprintf("%d:%d", port, port)})
+	base := NewBaseDriver("postgres", cli.Raw(), cfg, image, []string{fmt.Sprintf("%d:5432", port)})
 	return &PostgresDriver{BaseDriver: base, password: password}
 }
 

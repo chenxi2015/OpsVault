@@ -42,7 +42,7 @@ func NewRabbitMQDriver(cli DockerClient, cfg *viper.Viper, user, pass string) *R
 	if pass == "" {
 		pass = "password"
 	}
-	base := NewBaseDriver("rabbitmq", cli.Raw(), cfg, image, []string{fmt.Sprintf("%d:%d", port, port), fmt.Sprintf("%d:%d", uiPort, uiPort)})
+	base := NewBaseDriver("rabbitmq", cli.Raw(), cfg, image, []string{fmt.Sprintf("%d:5672", port), fmt.Sprintf("%d:15672", uiPort)})
 	drv := &RabbitMQDriver{BaseDriver: base, user: user, pass: pass}
 	drv.PrepareConfig = drv.prepareConfig
 	return drv

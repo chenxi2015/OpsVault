@@ -34,7 +34,7 @@ func NewRocketMQDriver(cli DockerClient, cfg *viper.Viper) *RocketMQDriver {
 	if image == "" {
 		image = "apache/rocketmq:5.3.0"
 	}
-	base := NewBaseDriver("rocketmq", cli.Raw(), cfg, image, []string{fmt.Sprintf("%d:%d", namesrvPort, namesrvPort), fmt.Sprintf("%d:%d", brokerPort, brokerPort)})
+	base := NewBaseDriver("rocketmq", cli.Raw(), cfg, image, []string{fmt.Sprintf("%d:9876", namesrvPort), fmt.Sprintf("%d:10911", brokerPort)})
 	drv := &RocketMQDriver{BaseDriver: base}
 	drv.PrepareConfig = drv.prepareConfig
 	return drv

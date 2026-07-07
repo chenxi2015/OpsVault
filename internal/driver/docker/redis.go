@@ -28,7 +28,7 @@ func NewRedisDriver(cli DockerClient, cfg *viper.Viper, password string) *RedisD
 	if password == "" {
 		password = cfg.GetString("redis.password")
 	}
-	base := NewBaseDriver("redis", cli.Raw(), cfg, image, []string{fmt.Sprintf("%d:%d", port, port)})
+	base := NewBaseDriver("redis", cli.Raw(), cfg, image, []string{fmt.Sprintf("%d:6379", port)})
 	drv := &RedisDriver{BaseDriver: base, password: password}
 	drv.PrepareConfig = drv.prepareConfig
 	return drv

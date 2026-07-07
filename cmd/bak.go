@@ -116,21 +116,21 @@ func newBakListCommand(cfg *viper.Viper) *cobra.Command {
 			// Render Table Headers
 			nameHeader := bakHeaderStyle.Width(25).Render("NAME")
 			sizeHeader := bakHeaderStyle.Width(10).Render("SIZE")
-			servicesHeader := bakHeaderStyle.Width(25).Render("SERVICES")
-			timeHeader := bakHeaderStyle.Width(20).Render("CREATED TIME")
-			descHeader := bakHeaderStyle.Width(20).Render("DESCRIPTION")
+			servicesHeader := bakHeaderStyle.Width(20).Render("SERVICES")
+			timeHeader := bakHeaderStyle.Width(22).Render("CREATED TIME")
+			descHeader := bakHeaderStyle.Width(30).Render("DESCRIPTION")
 
-			cmd.Println(nameHeader + sizeHeader + servicesHeader + timeHeader + descHeader)
+			cmd.Println(lipgloss.JoinHorizontal(lipgloss.Top, nameHeader, sizeHeader, servicesHeader, timeHeader, descHeader))
 
 			// Render Rows
 			for _, b := range backups {
 				nameRow := bakRowStyle.Width(25).Render(b.Name)
 				sizeRow := bakRowStyle.Width(10).Render(formatBytes(b.SizeBytes))
-				servicesRow := bakRowStyle.Width(25).Render(strings.Join(b.Services, ", "))
-				timeRow := bakRowStyle.Width(20).Render(b.Timestamp.Format("2006-01-02 15:04:05"))
-				descRow := bakRowStyle.Width(20).Render(b.Description)
+				servicesRow := bakRowStyle.Width(20).Render(strings.Join(b.Services, ", "))
+				timeRow := bakRowStyle.Width(22).Render(b.Timestamp.Format("2006-01-02 15:04:05"))
+				descRow := bakRowStyle.Width(30).Render(b.Description)
 
-				cmd.Println(nameRow + sizeRow + servicesRow + timeRow + descRow)
+				cmd.Println(lipgloss.JoinHorizontal(lipgloss.Top, nameRow, sizeRow, servicesRow, timeRow, descRow))
 			}
 
 			return nil
