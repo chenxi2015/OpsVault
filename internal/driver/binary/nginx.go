@@ -154,12 +154,16 @@ func (d *NginxDriver) reloadNginxSafe() error {
 	if !d.isLinuxOrTest() {
 		return nil
 	}
-	pid, _ := system.FindPID("nginx")
-	if pid <= 0 {
-		return nil
+	isTest := flag.Lookup("test.v") != nil
+	if !isTest {
+		pid, _ := system.FindPID("nginx")
+		if pid <= 0 {
+			return nil
+		}
 	}
-	return system.ReloadService("nginx")
+	return reloadNginx()
 }
+
 
 func (d *NginxDriver) AddVHost(domain, root string) error {
 	if domain == "" || root == "" {
@@ -339,3 +343,32 @@ func (d *NginxDriver) DeleteSSL(domain string) error {
 	}
 	return d.DisableSSL(domain)
 }
+
+// CheckExisting checks if Nginx is already installed or running on the host system.
+// It returns true and a descriptive reason if Nginx is detected.
+func (d *NginxDriver) CheckExisting() (bool, string) {
+	// 1. Check install path
+	installedPath := nginxConfigString(d.Config, "nginx.install_path")
+	if info, err := os.Stat(installedPath); err == nil {
+		if info.IsDir() {
+			if files, err := os.ReadDir(installedPath); err == nil && len(files) > 0 {
+				return true, fmt.Sprintf("Nginx installation directory (%s) already exists and is not empty", installedPath)
+			}
+		} else {
+			return true, fmt.Sprintf("Nginx installation path (%s) exists as a file", installedPath)
+		}
+	}
+
+	// 2. Check if a process named "nginx" is running
+	if pid, _ := system.FindPID("nginx"); pid > 0 {
+		return true, fmt.Sprintf("A running Nginx process (PID %d) was detected", pid)
+	}
+
+	// 3. Check if nginx command is available in system PATH
+	if path, err := exec.LookPath("nginx"); err == nil {
+		return true, fmt.Sprintf("Nginx command is already available in system PATH (%s)", path)
+	}
+
+	return false, ""
+}
+

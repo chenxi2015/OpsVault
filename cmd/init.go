@@ -164,6 +164,7 @@ func newInitCommand(cfg *viper.Viper, dockerFactory func() (*client.Client, erro
 		serviceNames string
 		allServices  bool
 		purge        bool
+		force        bool
 	)
 
 	cmd := &cobra.Command{
@@ -222,6 +223,25 @@ func newInitCommand(cfg *viper.Viper, dockerFactory func() (*client.Client, erro
 				}
 
 				cmd.Printf("\n%s\n", headerStyle.Render(fmt.Sprintf("=== [%s] ===", strings.ToUpper(foundSvc.Name))))
+
+				if foundSvc.Name == "nginx" && !force {
+					if checker, ok := foundSvc.Driver.(interface {
+						CheckExisting() (bool, string)
+					}); ok {
+						if exists, reason := checker.CheckExisting(); exists {
+							cmd.Printf("%s: %s.\n", warnStyle.Render("Warning"), reason)
+							cmd.Printf("Are you sure you want to reinstall/overwrite Nginx? [y/N]: ")
+							var response string
+							_, _ = fmt.Scanln(&response)
+							response = strings.ToLower(strings.TrimSpace(response))
+							if response != "y" && response != "yes" {
+								cmd.Println(warnStyle.Render("Nginx installation cancelled, skipping..."))
+								continue
+							}
+						}
+					}
+				}
+
 				if purge {
 					cmd.Printf("%s\n", infoStyle.Render(fmt.Sprintf("Purging existing %s...", foundSvc.Name)))
 					if err := foundSvc.Driver.Uninstall(true); err != nil {
@@ -253,6 +273,7 @@ func newInitCommand(cfg *viper.Viper, dockerFactory func() (*client.Client, erro
 	cmd.Flags().StringVar(&serviceNames, "services", "", "Comma-separated list of services to initialize (e.g. nginx,mysql)")
 	cmd.Flags().BoolVar(&allServices, "all", false, "Initialize all services")
 	cmd.Flags().BoolVar(&purge, "purge", false, "Purge existing configurations/data before installation")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force installation and overwrite existing services without prompt")
 
 	return cmd
 }
