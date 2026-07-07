@@ -197,7 +197,11 @@ func NginxPanelView(m RootModel) string {
 
 			if selectedCertPath != "" {
 				pathStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
-				detailLines = append(detailLines, pathStyle.Render(fmt.Sprintf("Cert: %s", selectedCertPath)), "")
+				if _, err := os.Stat(selectedCertPath); err == nil {
+					detailLines = append(detailLines, pathStyle.Render(fmt.Sprintf("Cert: %s", selectedCertPath)), "")
+				} else {
+					detailLines = append(detailLines, pathStyle.Render("Cert: (None)"), "")
+				}
 			}
 		}
 
