@@ -95,6 +95,7 @@ func NginxPanelView(m RootModel) string {
 			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("--------------------------------------"),
 		)
 
+		var selectedPath string
 		if len(m.nginxVHosts) == 0 {
 			detailLines = append(detailLines, "No Virtual Hosts configured.", "")
 		} else {
@@ -105,10 +106,16 @@ func NginxPanelView(m RootModel) string {
 				if m.focus == focusDetail && idx == m.selectedVHostIndex {
 					prefix = "> "
 					rowStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10"))
+					selectedPath = vh["path"]
 				}
 				detailLines = append(detailLines, prefix+rowStyle.Render(domain))
 			}
 			detailLines = append(detailLines, "")
+		}
+
+		if selectedPath != "" {
+			pathStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+			detailLines = append(detailLines, pathStyle.Render(fmt.Sprintf("Config: %s", selectedPath)), "")
 		}
 
 		detailLines = append(detailLines,
@@ -133,6 +140,7 @@ func NginxPanelView(m RootModel) string {
 				sslRoot = m.config.GetString("nginx.ssl_root")
 			}
 
+			var selectedCertPath string
 			for idx, vh := range m.nginxVHosts {
 				domain := strings.TrimSuffix(vh["domain"], ".conf")
 				certPath := filepath.Join(sslRoot, domain, "fullchain.pem")
@@ -149,10 +157,16 @@ func NginxPanelView(m RootModel) string {
 				if m.focus == focusDetail && idx == m.selectedCertIndex {
 					prefix = "> "
 					rowStyle = lipgloss.NewStyle().Bold(true)
+					selectedCertPath = certPath
 				}
 				detailLines = append(detailLines, fmt.Sprintf("%s%s (%s)", prefix, rowStyle.Render(domain), sslStyle.Render(sslStatus)))
 			}
 			detailLines = append(detailLines, "")
+
+			if selectedCertPath != "" {
+				pathStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+				detailLines = append(detailLines, pathStyle.Render(fmt.Sprintf("Cert: %s", selectedCertPath)), "")
+			}
 		}
 
 		detailLines = append(detailLines,

@@ -156,7 +156,9 @@ func runAction(cfg *viper.Viper, dockerCli *client.Client, service ServiceRef, a
 				err = fmt.Errorf("service %s does not support version query", name)
 			}
 		case ActionDLQStat:
-			if rocketmqDrv, ok := drv.(interface{ DLQStat() (map[string]string, error) }); ok {
+			if rocketmqDrv, ok := drv.(interface {
+				DLQStat() (map[string]string, error)
+			}); ok {
 				var stats map[string]string
 				stats, err = rocketmqDrv.DLQStat()
 				if err == nil {

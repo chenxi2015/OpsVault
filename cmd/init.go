@@ -31,6 +31,21 @@ var (
 
 	unselectedItemStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("240")) // Dim gray checkbox [ ]
+
+	successStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("10")) // Green for success
+
+	warnStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("11")) // Yellow for warnings
+
+	infoStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("12")) // Light Blue for information
+
+	headerStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("13")) // Magenta for headers
 )
 
 type initItem struct {
@@ -45,8 +60,8 @@ type initModel struct {
 	quitted bool
 }
 
-func newInitModel() initModel {
-	return initModel{
+func newInitModel() *initModel {
+	return &initModel{
 		items: []initItem{
 			{name: "nginx", selected: true},
 			{name: "mysql", selected: true},
@@ -58,11 +73,11 @@ func newInitModel() initModel {
 	}
 }
 
-func (m initModel) Init() tea.Cmd {
+func (m *initModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -87,7 +102,7 @@ func (m initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m initModel) View() string {
+func (m *initModel) View() string {
 	if m.quitted {
 		return "Initialization cancelled.\n"
 	}
@@ -171,7 +186,7 @@ func newInitCommand(cfg *viper.Viper, dockerFactory func() (*client.Client, erro
 				}
 			} else {
 				m := newInitModel()
-				p := tea.NewProgram(&m)
+				p := tea.NewProgram(m)
 				if _, err := p.Run(); err != nil {
 					return err
 				}
@@ -186,11 +201,11 @@ func newInitCommand(cfg *viper.Viper, dockerFactory func() (*client.Client, erro
 			}
 
 			if len(targetServices) == 0 {
-				cmd.Println("No services selected for initialization.")
+				cmd.Println(warnStyle.Render("No services selected for initialization."))
 				return nil
 			}
 
-			cmd.Printf("Initializing selected services: %s\n", strings.Join(targetServices, ", "))
+			cmd.Printf("%s %s\n", infoStyle.Render("Initializing selected services:"), successStyle.Render(strings.Join(targetServices, ", ")))
 
 			for _, targetName := range targetServices {
 				var foundSvc *tui.ServiceRef
@@ -204,28 +219,28 @@ func newInitCommand(cfg *viper.Viper, dockerFactory func() (*client.Client, erro
 					return fmt.Errorf("unknown service: %s", targetName)
 				}
 
-				cmd.Printf("\n--- [%s] ---\n", foundSvc.Name)
+				cmd.Printf("\n%s\n", headerStyle.Render(fmt.Sprintf("=== [%s] ===", strings.ToUpper(foundSvc.Name))))
 				if purge {
-					cmd.Printf("Purging existing %s...\n", foundSvc.Name)
+					cmd.Printf("%s\n", infoStyle.Render(fmt.Sprintf("Purging existing %s...", foundSvc.Name)))
 					if err := foundSvc.Driver.Uninstall(true); err != nil {
-						cmd.Printf("Purge failed: %v (continuing)\n", err)
+						cmd.Printf("%s\n", warnStyle.Render(fmt.Sprintf("Purge failed: %v (continuing)", err)))
 					}
 				}
 
-				cmd.Printf("Installing %s...\n", foundSvc.Name)
+				cmd.Printf("%s\n", infoStyle.Render(fmt.Sprintf("Installing %s...", foundSvc.Name)))
 				if err := foundSvc.Driver.Install(); err != nil {
 					return fmt.Errorf("failed to install %s: %w", foundSvc.Name, err)
 				}
 
-				cmd.Printf("Starting %s...\n", foundSvc.Name)
+				cmd.Printf("%s\n", infoStyle.Render(fmt.Sprintf("Starting %s...", foundSvc.Name)))
 				if err := foundSvc.Driver.Start(); err != nil {
 					return fmt.Errorf("failed to start %s: %w", foundSvc.Name, err)
 				}
 
-				cmd.Printf("%s initialized successfully.\n", foundSvc.Name)
+				cmd.Printf("%s\n", successStyle.Render(fmt.Sprintf("✓ %s initialized successfully.", foundSvc.Name)))
 			}
 
-			cmd.Println("\nAll selected services initialized successfully.")
+			cmd.Println("\n" + successStyle.Render("★ All selected services initialized successfully. ★"))
 			return nil
 		},
 	}
