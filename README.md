@@ -11,12 +11,15 @@ OpsVault 是一个面向 CentOS 7 / CentOS Stream 的运维工具箱，提供：
 
 - 完整命令树：
   - `opsvault tui`
+  - `opsvault init` (一键初始化与服务选择安装)
+  - `opsvault doctor` (系统与运行环境体检诊断)
   - `opsvault nginx ...`
   - `opsvault mysql ...`
   - `opsvault redis ...`
   - `opsvault rocketmq ...`
   - `opsvault rabbitmq ...`
   - `opsvault postgres ...`
+  - `opsvault bak ...` (配置备份与恢复)
 - 全局配置加载与默认配置模板
 - `driver.ServiceDriver` 统一接口与 `ServiceStatus` 状态结构
 - Docker 网络/基础驱动封装
@@ -34,6 +37,45 @@ OpsVault 是一个面向 CentOS 7 / CentOS Stream 的运维工具箱，提供：
 
 ```bash
 opsvault --config /path/to/config.yaml mysql status
+```
+
+## 配置备份与恢复 (bak)
+
+`opsvault bak` 子命令用于备份和恢复各中间件服务的配置文件（如 MySQL 的 `my.cnf`、Redis 的 `redis.conf`、Nginx 的 `conf/` 目录等）以及全局 `default.yaml` 配置文件。
+
+### 1. 创建备份
+备份文件默认以 `backup_YYYYMMDD_HHMMSS` 命名，也可以自定义名称和描述。
+
+```bash
+# 备份所有服务的配置及全局配置
+opsvault bak create --desc "系统初始化配置备份"
+
+# 备份指定服务的配置（如仅备份 mysql 和 nginx）
+opsvault bak create mysql nginx --name my-init-backup
+```
+
+### 2. 查看备份列表
+```bash
+opsvault bak list
+```
+
+### 3. 恢复配置
+恢复指定备份的配置文件，在执行恢复前有安全确认交互，也可使用 `-f` 强行覆盖。
+
+```bash
+# 恢复备份中的所有服务配置
+opsvault bak restore my-init-backup
+
+# 仅恢复备份中的 nginx 配置
+opsvault bak restore my-init-backup nginx
+
+# 强制恢复无需确认交互
+opsvault bak restore my-init-backup -f
+```
+
+### 4. 删除备份
+```bash
+opsvault bak delete my-init-backup
 ```
 
 ## 构建与测试

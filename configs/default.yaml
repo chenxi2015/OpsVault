@@ -5,6 +5,8 @@ docker:
     resource_limit:
         cpu_max: "2"
         mem_max: 2g
+backup:
+    storage_path: /data/opsvault/bak
 log:
     level: info
     storage_path: /data/opsvault/logs

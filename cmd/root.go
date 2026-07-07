@@ -70,6 +70,7 @@ func init() {
 	rootCmd.AddCommand(rocketmq.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(rabbitmq.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(postgres.NewCommand(config, dockerFactory))
+	rootCmd.AddCommand(newBakCommand(config))
 }
 
 func initConfig() error {
@@ -162,6 +163,7 @@ func applyDefaultConfig(v *viper.Viper) {
 	v.SetDefault("nginx.logrotate_path", "/etc/logrotate.d/nginx")
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.storage_path", "/data/opsvault/logs")
+	v.SetDefault("backup.storage_path", "/data/opsvault/bak")
 }
 
 func newDockerClient() (*client.Client, error) {
