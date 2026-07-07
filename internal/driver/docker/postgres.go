@@ -5,10 +5,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"OpsVault/pkg/credutil"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/spf13/viper"
 )
+
 
 type PostgresDriver struct {
 	*BaseDriver
@@ -62,3 +65,16 @@ func (d *PostgresDriver) containerSpec() (*container.Config, *container.HostConf
 func (d *PostgresDriver) Upgrade(targetVersion string) error {
 	return d.recreateWithImage(targetVersion, d.containerSpec)
 }
+
+func (d *PostgresDriver) GetCredentials() []credutil.Credential {
+	port := d.Config.GetString("postgres.port")
+	if port == "" {
+		port = "5432"
+	}
+	return []credutil.Credential{
+		{Label: "主机", Value: fmt.Sprintf("localhost:%s", port)},
+		{Label: "用户名", Value: "postgres"},
+		{Label: "密  码", Value: d.password},
+	}
+}
+

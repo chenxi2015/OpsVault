@@ -132,6 +132,7 @@ func CurrentMode(v *viper.Viper) driver.Mode {
 }
 
 func applyDefaultConfig(v *viper.Viper) {
+	v.SetDefault("docker.name_prefix", "opsvault")
 	v.SetDefault("docker.network_name", "opsvault-net")
 	v.SetDefault("docker.cidr", "172.28.0.0/16")
 	v.SetDefault("docker.data_root", "/data/opsvault")

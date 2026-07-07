@@ -6,10 +6,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"OpsVault/pkg/credutil"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/spf13/viper"
 )
+
 
 type MySQLDriver struct {
 	*BaseDriver
@@ -88,3 +91,16 @@ default-character-set=utf8mb4
 func (d *MySQLDriver) Upgrade(targetVersion string) error {
 	return d.recreateWithImage(targetVersion, d.containerSpec)
 }
+
+func (d *MySQLDriver) GetCredentials() []credutil.Credential {
+	port := d.Config.GetString("mysql.port")
+	if port == "" {
+		port = "3306"
+	}
+	return []credutil.Credential{
+		{Label: "主机", Value: fmt.Sprintf("localhost:%s", port)},
+		{Label: "用户名", Value: "root"},
+		{Label: "密  码", Value: d.rootPassword},
+	}
+}
+

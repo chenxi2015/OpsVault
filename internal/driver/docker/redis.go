@@ -6,10 +6,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"OpsVault/pkg/credutil"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/spf13/viper"
 )
+
 
 type RedisDriver struct {
 	*BaseDriver
@@ -120,3 +123,19 @@ aof-use-rdb-preamble yes
 func (d *RedisDriver) Upgrade(targetVersion string) error {
 	return d.recreateWithImage(targetVersion, d.containerSpec)
 }
+
+func (d *RedisDriver) GetCredentials() []credutil.Credential {
+	port := d.Config.GetString("redis.port")
+	if port == "" {
+		port = "6379"
+	}
+	pwd := d.password
+	if pwd == "" {
+		pwd = "(无认证)"
+	}
+	return []credutil.Credential{
+		{Label: "主机", Value: fmt.Sprintf("localhost:%s", port)},
+		{Label: "密  码", Value: pwd},
+	}
+}
+

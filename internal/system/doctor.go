@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 
+	"OpsVault/pkg/dockercli"
 	"OpsVault/pkg/netutil"
 	"OpsVault/pkg/sysutil"
 
@@ -218,12 +219,9 @@ func checkDockerDaemon(ctx context.Context, dockerCli *client.Client) (bool, Dia
 
 func checkDockerNetwork(ctx context.Context, config *viper.Viper, cli *client.Client) DiagnosticItem {
 	item := DiagnosticItem{Name: "Docker 专属网桥"}
-	netName := "opsvault-net"
+	netName := dockercli.ResolveNetworkName(config)
 	cidr := "172.28.0.0/16"
 	if config != nil {
-		if val := config.GetString("docker.network_name"); val != "" {
-			netName = val
-		}
 		if val := config.GetString("docker.cidr"); val != "" {
 			cidr = val
 		}

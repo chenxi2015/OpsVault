@@ -1,6 +1,9 @@
 package driver
 
-import "time"
+import (
+	"OpsVault/pkg/credutil"
+	"time"
+)
 
 type Mode string
 
@@ -33,6 +36,11 @@ type ServiceDriver interface {
 	Upgrade(targetVersion string) error
 	Status() (*ServiceStatus, error)
 }
+
+type CredentialProvider interface {
+	GetCredentials() []credutil.Credential
+}
+
 
 type LogReader interface {
 	TailLogs(lines int) (string, error)

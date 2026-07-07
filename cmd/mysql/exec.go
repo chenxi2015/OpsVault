@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"OpsVault/pkg/dockercli"
 	"OpsVault/pkg/executil"
 
 	"github.com/spf13/cobra"
@@ -11,7 +12,7 @@ func (c *commandSet) newExecCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "exec",
 		Short: "Open an interactive MySQL shell inside the container",
-		Long:  "Connects to the opsvault-mysql container and opens a mysql interactive shell.\nEquivalent to: docker exec -it opsvault-mysql mysql -u <user> -p",
+		Long:  "Connects to the MySQL container and opens a mysql interactive shell.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			password := c.config.GetString("mysql.root_password")
 			args := []string{"mysql", "-u", user}
@@ -21,7 +22,8 @@ func (c *commandSet) newExecCommand() *cobra.Command {
 				// Prompt for password interactively
 				args = append(args, "-p")
 			}
-			return executil.DockerExec("opsvault-mysql", args)
+			containerName := dockercli.ResolveContainerName(c.config, "mysql")
+			return executil.DockerExec(containerName, args)
 		},
 	}
 	cmd.Flags().StringVarP(&user, "user", "u", "root", "MySQL user to connect as")

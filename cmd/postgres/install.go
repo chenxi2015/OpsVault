@@ -37,15 +37,7 @@ func (c *commandSet) newInstallCommand() *cobra.Command {
 			if err := drv.Install(); err != nil {
 				return err
 			}
-			port := c.config.GetString("postgres.port")
-			if port == "" {
-				port = "5432"
-			}
-			credutil.PrintCredentials("PostgreSQL", []credutil.Credential{
-				{Label: "主机", Value: fmt.Sprintf("localhost:%s", port)},
-				{Label: "用户名", Value: "postgres"},
-				{Label: "密  码", Value: password},
-			})
+			credutil.PrintCredentials("PostgreSQL", drv.GetCredentials())
 			return nil
 		},
 	}

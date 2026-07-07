@@ -9,6 +9,7 @@ import (
 
 // ConfigKeys lists all editable configuration keys.
 var ConfigKeys = []string{
+	"docker.name_prefix",
 	"docker.network_name",
 	"docker.cidr",
 	"docker.data_root",

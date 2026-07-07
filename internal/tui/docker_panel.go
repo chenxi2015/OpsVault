@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"OpsVault/internal/driver"
+	"OpsVault/pkg/dockercli"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -75,7 +76,7 @@ func DockerPanelView(m RootModel) string {
 
 	if m.config != nil {
 		imageVal = m.config.GetString(selectedRef.Name + ".image")
-		netVal = m.config.GetString("docker.network_name")
+		netVal = dockercli.ResolveNetworkName(m.config)
 		pathVal = fmt.Sprintf("%s/%s", m.config.GetString("docker.data_root"), selectedRef.Name)
 	}
 

@@ -44,20 +44,7 @@ func (c *commandSet) newInstallCommand() *cobra.Command {
 			if err := drv.Install(); err != nil {
 				return err
 			}
-			uiPort := c.config.GetString("rabbitmq.ui_port")
-			if uiPort == "" {
-				uiPort = "15672"
-			}
-			amqpPort := c.config.GetString("rabbitmq.port")
-			if amqpPort == "" {
-				amqpPort = "5672"
-			}
-			credutil.PrintCredentials("RabbitMQ", []credutil.Credential{
-				{Label: "管理界面", Value: fmt.Sprintf("http://localhost:%s", uiPort)},
-				{Label: "AMQP 端口", Value: fmt.Sprintf("localhost:%s", amqpPort)},
-				{Label: "用户名", Value: user},
-				{Label: "密  码", Value: pass},
-			})
+			credutil.PrintCredentials("RabbitMQ", drv.GetCredentials())
 			return nil
 		},
 	}

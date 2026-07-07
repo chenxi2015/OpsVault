@@ -1,4 +1,5 @@
 docker:
+    name_prefix: opsvault
     cidr: 172.28.0.0/16
     data_root: /data/opsvault
     network_name: opsvault-net

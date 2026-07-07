@@ -1,8 +1,6 @@
 package redis
 
 import (
-	"fmt"
-
 	"OpsVault/cmd/common"
 	"OpsVault/internal/driver"
 	"OpsVault/pkg/credutil"
@@ -34,19 +32,7 @@ func (c *commandSet) newInstallCommand() *cobra.Command {
 			if err := drv.Install(); err != nil {
 				return err
 			}
-			port := c.config.GetString("redis.port")
-			if port == "" {
-				port = "6379"
-			}
-			creds := []credutil.Credential{
-				{Label: "主机", Value: fmt.Sprintf("localhost:%s", port)},
-			}
-			if password != "" {
-				creds = append(creds, credutil.Credential{Label: "密  码", Value: password})
-			} else {
-				creds = append(creds, credutil.Credential{Label: "密  码", Value: "(无认证)"})
-			}
-			credutil.PrintCredentials("Redis", creds)
+			credutil.PrintCredentials("Redis", drv.GetCredentials())
 			return nil
 		},
 	}

@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"OpsVault/internal/driver"
 	"OpsVault/internal/tui"
+	"OpsVault/pkg/credutil"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -238,6 +240,9 @@ func newInitCommand(cfg *viper.Viper, dockerFactory func() (*client.Client, erro
 				}
 
 				cmd.Printf("%s\n", successStyle.Render(fmt.Sprintf("✓ %s initialized successfully.", foundSvc.Name)))
+				if cp, ok := foundSvc.Driver.(driver.CredentialProvider); ok {
+					credutil.PrintCredentials(strings.ToUpper(foundSvc.Name), cp.GetCredentials())
+				}
 			}
 
 			cmd.Println("\n" + successStyle.Render("★ All selected services initialized successfully. ★"))

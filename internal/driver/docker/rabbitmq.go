@@ -6,10 +6,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"OpsVault/pkg/credutil"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/spf13/viper"
 )
+
 
 type RabbitMQDriver struct {
 	*BaseDriver
@@ -105,3 +108,21 @@ default_pass = %s
 func (d *RabbitMQDriver) Upgrade(targetVersion string) error {
 	return d.recreateWithImage(targetVersion, d.containerSpec)
 }
+
+func (d *RabbitMQDriver) GetCredentials() []credutil.Credential {
+	uiPort := d.Config.GetString("rabbitmq.ui_port")
+	if uiPort == "" {
+		uiPort = "15672"
+	}
+	amqpPort := d.Config.GetString("rabbitmq.port")
+	if amqpPort == "" {
+		amqpPort = "5672"
+	}
+	return []credutil.Credential{
+		{Label: "管理界面", Value: fmt.Sprintf("http://localhost:%s", uiPort)},
+		{Label: "AMQP 端口", Value: fmt.Sprintf("localhost:%s", amqpPort)},
+		{Label: "用户名", Value: d.user},
+		{Label: "密  码", Value: d.pass},
+	}
+}
+

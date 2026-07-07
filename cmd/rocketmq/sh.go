@@ -1,6 +1,7 @@
 package rocketmq
 
 import (
+	"OpsVault/pkg/dockercli"
 	"OpsVault/pkg/executil"
 
 	"github.com/spf13/cobra"
@@ -12,9 +13,10 @@ func (c *commandSet) newShCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sh",
 		Short: "Open an interactive shell inside the RocketMQ container",
-		Long:  "Connects to the opsvault-rocketmq container with a bash shell.\nUse 'mqadmin' commands inside for advanced operations.\nEquivalent to: docker exec -it opsvault-rocketmq bash",
+		Long:  "Connects to the RocketMQ container with a bash shell.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return executil.DockerExec("opsvault-rocketmq", []string{"bash"})
+			containerName := dockercli.ResolveContainerName(c.config, "rocketmq")
+			return executil.DockerExec(containerName, []string{"bash"})
 		},
 	}
 	return cmd

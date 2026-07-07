@@ -8,6 +8,7 @@ import (
 
 	"OpsVault/internal/driver"
 	dockdrv "OpsVault/internal/driver/docker"
+	"OpsVault/pkg/credutil"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/docker/docker/client"
@@ -65,6 +66,11 @@ func runAction(cfg *viper.Viper, dockerCli *client.Client, service ServiceRef, a
 		case ActionInstall:
 			err = drv.Install()
 			output = fmt.Sprintf("Installation completed for service %s.", name)
+			if err == nil {
+				if cp, ok := drv.(driver.CredentialProvider); ok {
+					output += "\n\n" + credutil.RenderCredentials(strings.ToUpper(name), cp.GetCredentials())
+				}
+			}
 		case ActionStart:
 			err = drv.Start()
 			output = fmt.Sprintf("Started service %s.", name)

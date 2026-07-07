@@ -40,15 +40,7 @@ func (c *commandSet) newInstallCommand() *cobra.Command {
 				return err
 			}
 			logger.AuditLog("mysql", "install", fmt.Sprintf("image=%s", c.config.GetString("mysql.image")), true)
-			port := c.config.GetString("mysql.port")
-			if port == "" {
-				port = "3306"
-			}
-			credutil.PrintCredentials("MySQL", []credutil.Credential{
-				{Label: "主机", Value: fmt.Sprintf("localhost:%s", port)},
-				{Label: "用户名", Value: "root"},
-				{Label: "密  码", Value: rootPwd},
-			})
+			credutil.PrintCredentials("MySQL", drv.GetCredentials())
 			return nil
 		},
 	}

@@ -51,9 +51,8 @@ type Credential struct {
 	Value string
 }
 
-// PrintCredentials prints a styled credential card to stdout after successful installation.
-// serviceName is the display name (e.g. "MySQL"), creds is an ordered list of labels+values.
-func PrintCredentials(serviceName string, creds []Credential) {
+// RenderCredentials returns a styled credential card as a string.
+func RenderCredentials(serviceName string, creds []Credential) string {
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("11"))
@@ -97,7 +96,14 @@ func PrintCredentials(serviceName string, creds []Credential) {
 	lines = append(lines, "")
 	lines = append(lines, warnStyle.Render("⚠️  此密码不会再次显示，请立即记录！"))
 
+	return boxStyle.Render(strings.Join(lines, "\n"))
+}
+
+// PrintCredentials prints a styled credential card to stdout after successful installation.
+// serviceName is the display name (e.g. "MySQL"), creds is an ordered list of labels+values.
+func PrintCredentials(serviceName string, creds []Credential) {
 	fmt.Println()
-	fmt.Println(boxStyle.Render(strings.Join(lines, "\n")))
+	fmt.Println(RenderCredentials(serviceName, creds))
 	fmt.Println()
 }
+
