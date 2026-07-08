@@ -14,6 +14,8 @@ import (
 	"OpsVault/cmd/redis"
 	"OpsVault/cmd/rocketmq"
 	"OpsVault/cmd/elk"
+	"OpsVault/cmd/jenkins"
+	"OpsVault/cmd/gitlab"
 	"OpsVault/internal/driver"
 	"OpsVault/pkg/dockercli"
 	"OpsVault/pkg/logger"
@@ -92,6 +94,8 @@ func init() {
 	rootCmd.AddCommand(rabbitmq.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(postgres.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(elk.NewCommand(config, dockerFactory))
+	rootCmd.AddCommand(jenkins.NewCommand(config, dockerFactory))
+	rootCmd.AddCommand(gitlab.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(newBakCommand(config))
 }
 
@@ -192,7 +196,15 @@ func applyDefaultConfig(v *viper.Viper) {
 	v.SetDefault("elk.logstash_image", "logstash:8.12.0")
 	v.SetDefault("elk.logstash_port", 5044)
 	v.SetDefault("elk.es_java_opts", "-Xms512m -Xmx512m")
+	v.SetDefault("jenkins.image", "jenkins/jenkins:lts")
+	v.SetDefault("jenkins.port", 8080)
+	v.SetDefault("jenkins.agent_port", 50000)
+	v.SetDefault("gitlab.image", "gitlab/gitlab-ce:latest")
+	v.SetDefault("gitlab.port", 8082)
+	v.SetDefault("gitlab.ssh_port", 2222)
+	v.SetDefault("gitlab.https_port", 8443)
 	v.SetDefault("log.level", "info")
+
 	v.SetDefault("log.storage_path", "/data/opsvault/logs")
 	v.SetDefault("backup.storage_path", "/data/opsvault/bak")
 }

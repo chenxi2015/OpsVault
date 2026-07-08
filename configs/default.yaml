@@ -57,3 +57,13 @@ elk:
     logstash_image: "logstash:8.12.0"  # Logstash Docker 镜像标签
     logstash_port: 5044  # 映射到宿主机的 Logstash Beats 输入端口
     es_java_opts: "-Xms512m -Xmx512m"  # Elasticsearch JVM 堆内存大小限制设置
+jenkins:
+    image: "jenkins/jenkins:lts"  # Jenkins Docker 镜像标签
+    port: 8080  # 映射到宿主机的 Jenkins Web 端口
+    agent_port: 50000  # 映射到宿主机的 Jenkins Agent (JNLP) 端口
+gitlab:
+    image: "gitlab/gitlab-ce:latest"  # GitLab CE Docker 镜像标签
+    port: 8082  # 映射到宿主机的 GitLab Web (HTTP) 端口
+    ssh_port: 2222  # 映射到宿主机的 GitLab SSH 端口
+    https_port: 8443  # 映射到宿主机的 GitLab HTTPS 端口
+

@@ -136,6 +136,8 @@ func NewRootModel(provider ...StatusProvider) RootModel {
 			{Name: "rabbitmq"},
 			{Name: "postgres"},
 			{Name: "elk"},
+			{Name: "jenkins"},
+			{Name: "gitlab"},
 		}
 	}
 
