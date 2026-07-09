@@ -72,6 +72,8 @@ func newInitModel() *initModel {
 			{name: "rabbitmq", selected: false},
 			{name: "postgres", selected: false},
 			{name: "elk", selected: false},
+			{name: "jenkins", selected: false},
+			{name: "gitlab", selected: false},
 		},
 	}
 }
