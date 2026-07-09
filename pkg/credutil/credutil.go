@@ -1,21 +1,27 @@
 package credutil
 
 import (
-	"crypto/rand"
 	"fmt"
-	"math/big"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/sethvargo/go-password/password"
 )
 
-const (
-	// Exclude ambiguous characters like 0/O, 1/l/I for readability
-	passwordLower   = "abcdefghjkmnpqrstuvwxyz"
-	passwordUpper   = "ABCDEFGHJKMNPQRSTUVWXYZ"
-	passwordDigits  = "23456789"
-	passwordSpecial = "!@#$%^&*"
-)
+var defaultGenerator *password.Generator
+
+func init() {
+	var err error
+	defaultGenerator, err = password.NewGenerator(&password.GeneratorInput{
+		Digits:       "23456789",                // Exclude ambiguous 0, 1
+		Symbols:      "!@$%^&*",                 // Exclude #, ", ', \, space to avoid config parsing issues
+		LowerLetters: "abcdefghjkmnpqrstuvwxyz", // Exclude ambiguous l, o
+		UpperLetters: "ABCDEFGHJKMNPQRSTUVWXYZ", // Exclude ambiguous I, O
+	})
+	if err != nil {
+		defaultGenerator = nil
+	}
+}
 
 // GenPassword generates a cryptographically random password of the given length.
 // The result always contains at least one character from each character class.
@@ -23,26 +29,14 @@ func GenPassword(length int) string {
 	if length < 8 {
 		length = 8
 	}
-	all := passwordLower + passwordUpper + passwordDigits + passwordSpecial
-	classes := []string{passwordLower, passwordUpper, passwordDigits, passwordSpecial}
-
-	buf := make([]byte, length)
-	// Ensure at least one character from each class
-	for i, class := range classes {
-		idx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(class))))
-		buf[i] = class[idx.Int64()]
+	if defaultGenerator != nil {
+		pwd, err := defaultGenerator.Generate(length, length/4, length/4, false, false)
+		if err == nil {
+			return pwd
+		}
 	}
-	// Fill the rest randomly from all chars
-	for i := len(classes); i < length; i++ {
-		idx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(all))))
-		buf[i] = all[idx.Int64()]
-	}
-	// Shuffle buffer using Fisher-Yates with crypto/rand
-	for i := length - 1; i > 0; i-- {
-		j, _ := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
-		buf[i], buf[j.Int64()] = buf[j.Int64()], buf[i]
-	}
-	return string(buf)
+	pwd, _ := password.Generate(length, length/4, length/4, false, false)
+	return pwd
 }
 
 // Credential holds a single key-value pair for display.
@@ -106,4 +100,3 @@ func PrintCredentials(serviceName string, creds []Credential) {
 	fmt.Println(RenderCredentials(serviceName, creds))
 	fmt.Println()
 }
-

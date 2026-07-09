@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"OpsVault/pkg/credutil"
@@ -12,7 +13,6 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/spf13/viper"
 )
-
 
 type RedisDriver struct {
 	*BaseDriver
@@ -56,14 +56,16 @@ func (d *RedisDriver) containerSpec() (*container.Config, *container.HostConfig,
 
 	cmd := []string{"redis-server", "/usr/local/etc/redis/redis.conf"}
 
-	healthCmd := `redis-cli ping | grep PONG`
+	var env []string
 	if d.password != "" {
-		healthCmd = `redis-cli -a "$REDIS_PASSWORD" ping | grep PONG`
+		env = []string{"REDISCLI_AUTH=" + d.password}
 	}
+
+	healthCmd := `redis-cli ping | grep PONG`
 	return &container.Config{
 			Image: d.Image,
 			Cmd:   cmd,
-			Env:   []string{"REDIS_PASSWORD=" + d.password},
+			Env:   env,
 			Healthcheck: &container.HealthConfig{
 				Test:        []string{"CMD-SHELL", healthCmd},
 				Interval:    10 * time.Second,
@@ -120,7 +122,9 @@ aof-use-rdb-preamble yes
 		pwd = d.Config.GetString("redis.password")
 	}
 	if pwd != "" {
-		content += fmt.Sprintf("\nrequirepass %s\n", pwd)
+		escapedPwd := strings.ReplaceAll(pwd, "\\", "\\\\")
+		escapedPwd = strings.ReplaceAll(escapedPwd, "\"", "\\\"")
+		content += fmt.Sprintf("\nrequirepass \"%s\"\n", escapedPwd)
 	}
 
 	return os.WriteFile(filePath, []byte(content), 0o644)
@@ -144,4 +148,3 @@ func (d *RedisDriver) GetCredentials() []credutil.Credential {
 		{Label: "密  码", Value: pwd},
 	}
 }
-
