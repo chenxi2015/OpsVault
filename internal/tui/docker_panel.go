@@ -154,7 +154,7 @@ func DockerPanelView(m RootModel) string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("240")).
 		Padding(1, 2).
-		Width(26).
+		Width(32).
 		Height(12).
 		Render(strings.Join(sidebarLines, "\n"))
 
