@@ -385,7 +385,7 @@ func checkPorts(config *viper.Viper) DiagnosticItem {
 
 	if hasOccupied {
 		item.Status = StatusFail
-		item.Message = fmt.Sprintf("以下关键端口已被占用: %s%s", strings.Join(occupiedNames, ", "), tableStr)
+		item.Message = fmt.Sprintf("关键端口占用情况如下: %s", tableStr)
 		item.Suggestion = "请停止占用这些端口的本地服务，或者修改 configs/default.yaml 中对应组件的端口绑定配置。"
 	} else {
 		item.Status = StatusOk
