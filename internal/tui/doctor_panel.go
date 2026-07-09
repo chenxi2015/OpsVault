@@ -27,9 +27,12 @@ func DoctorPanelView(m RootModel) string {
 	borderStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
 
-	lines = append(lines, fmt.Sprintf("  %-25s  %-10s  %-40s",
-		headerStyle.Render("Check Item"),
-		headerStyle.Render("Status"),
+	colNameStyle := lipgloss.NewStyle().Width(25)
+	colStatusStyle := lipgloss.NewStyle().Width(10)
+
+	lines = append(lines, fmt.Sprintf("  %s  %s  %s",
+		colNameStyle.Render(headerStyle.Render("Check Item")),
+		colStatusStyle.Render(headerStyle.Render("Status")),
 		headerStyle.Render("Message")))
 	lines = append(lines, "  "+borderStyle.Render(strings.Repeat("-", 75)))
 
@@ -46,14 +49,17 @@ func DoctorPanelView(m RootModel) string {
 
 		// Handle multi-line messages (like tables) to align properly under the Message column
 		msgLines := strings.Split(item.Message, "\n")
-		lineContent := fmt.Sprintf("  %-25s  %-10s  %-40s", item.Name, statusColored, msgLines[0])
+		lineContent := fmt.Sprintf("  %s  %s  %s",
+			colNameStyle.Render(item.Name),
+			colStatusStyle.Render(statusColored),
+			msgLines[0])
 		lines = append(lines, lineContent)
 
 		if len(msgLines) > 1 {
-			// 2 (indent) + 25 (name width) + 2 (spaces) + 10 (status width) + 2 (spaces) = 41 spaces
-			indentPrefix := strings.Repeat(" ", 41)
+			// If it's a table or multi-line block, use a smaller indent (e.g., 4 spaces)
+			// to prevent content wrapping and misalignment in terminal.
 			for i := 1; i < len(msgLines); i++ {
-				lines = append(lines, indentPrefix+msgLines[i])
+				lines = append(lines, "    "+msgLines[i])
 			}
 		}
 

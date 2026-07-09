@@ -15,6 +15,7 @@ import (
 	"OpsVault/pkg/netutil"
 	"OpsVault/pkg/sysutil"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/spf13/viper"
@@ -301,19 +302,19 @@ func checkPorts(config *viper.Viper) DiagnosticItem {
 			}
 		}
 
-		statusStr := "未使用"
+		statusStr := lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Render("[未使用]")
 		occupantStr := "-"
 
 		if err := CheckPortAvailable(port); err != nil {
-			statusStr = "已占用"
+			statusStr = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true).Render("[已占用]")
 			hasOccupied = true
 			occupiedNames = append(occupiedNames, fmt.Sprintf("%d (%s)", port, pt.Service))
 
 			// Try to find the process occupying the port
 			if pid, procName, err := GetPortOccupant(port); err == nil {
-				occupantStr = fmt.Sprintf("%d/%s", pid, procName)
+				occupantStr = lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(fmt.Sprintf("%d/%s", pid, procName))
 			} else {
-				occupantStr = "未知进程"
+				occupantStr = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render("未知进程")
 			}
 		}
 
@@ -462,15 +463,7 @@ func checkFileLimits() DiagnosticItem {
 }
 
 func visualWidth(s string) int {
-	w := 0
-	for _, r := range s {
-		if r > 127 {
-			w += 2
-		} else {
-			w += 1
-		}
-	}
-	return w
+	return lipgloss.Width(s)
 }
 
 func padRight(s string, target int) string {
