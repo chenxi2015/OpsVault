@@ -1,73 +1,69 @@
 backup:
-    storage_path: /data/opsvault/bak  # 配置文件备份存储路径
+	storage_path: /data/opsvault/bak  # 配置文件备份存储路径
 docker:
-    bind_ip: 0.0.0.0  # 容器端口在宿主机上绑定的IP地址
-    cidr: 172.28.0.0/16  # 专用桥接网络的 CIDR 网段
-    data_root: /data/opsvault  # 宿主机数据挂载的根目录
-    name_prefix: opsvault  # 容器与网络名称的统一前缀
-    network_name: opsvault-net  # Docker 网络桥接网卡名称
-    resource_limit:
-        cpu_max: "2"  # 每个容器分配的最大 CPU 核心数
-        mem_max: 2g  # 每个容器分配的最大内存限制
+  bind_ip: 0.0.0.0  # 容器端口在宿主机上绑定的IP地址
+  cidr: 172.28.0.0/16  # 专用桥接网络的 CIDR 网段
+  data_root: /data/opsvault  # 宿主机数据挂载的根目录
+  name_prefix: opsvault  # 容器与网络名称的统一前缀
+  network_name: opsvault-net  # Docker 网络桥接网卡名称
+  resource_limit:
+    cpu_max: "2"  # 每个容器分配的最大 CPU 核心数
+    mem_max: 2g  # 每个容器分配的最大内存限制
 log:
-    level: info  # 日志级别 (debug, info, warn, error)
-    storage_path: /data/opsvault/logs  # 应用程序日志存储路径
+  level: info  # 日志级别 (debug, info, warn, error)
+  storage_path: /data/opsvault/logs  # 应用程序日志存储路径
 mode: docker  # 默认部署模式 (docker 或 binary)
 mysql:
-    image: mysql:8.0  # MySQL Docker 镜像标签
-    port: 3306  # 映射到宿主机的 MySQL 端口
-    root_password: ""  # MySQL root 密码（留空则自动生成随机密码）
+  image: mysql:8.0  # MySQL Docker 镜像标签
+  port: 3306  # 映射到宿主机的 MySQL 端口
+  root_password: ""  # MySQL root 密码（留空则自动生成随机密码）
 nginx:
-    install_path: /usr/local/nginx  # Nginx 安装目录（仅 binary 模式生效）
-    logrotate_path: /etc/logrotate.d/nginx  # Nginx 日志轮转配置文件路径
-    openssl_version: 1.1.1w  # 编译 Nginx 时使用的 OpenSSL 版本
-    pcre_version: "8.45"  # 编译 Nginx 时使用的 PCRE 版本
-    run_group: www  # Nginx 运行时的用户组
-    run_user: www  # Nginx 运行时的用户名
-    source_root: /usr/local/src/opsvault-nginx  # Nginx 源码下载与编译路径
-    ssl_root: /data/ssl  # SSL 证书存储目录
-    systemd_unit_path: /lib/systemd/system/nginx.service  # Nginx systemd 服务文件路径
-    version: 1.31.0  # 准备编译的 Nginx 版本
-    vhost_dir: ""  # 虚拟主机配置文件目录（留空则默认为 {install_path}/conf/vhost） 需要配置全路径地址 如：/usr/local/nginx/conf/vhost 
-    www_root: /data/wwwroot  # 网站根目录
-    wwwlogs_root: /data/wwwlogs  # Nginx 访问与错误日志目录
+  install_path: /usr/local/nginx  # Nginx 安装目录（仅 binary 模式生效）
+  logrotate_path: /etc/logrotate.d/nginx  # Nginx 日志轮转配置文件路径
+  openssl_version: 1.1.1w  # 编译 Nginx 时使用的 OpenSSL 版本
+  pcre_version: "8.45"  # 编译 Nginx 时使用的 PCRE 版本
+  run_group: www  # Nginx 运行时的用户组
+  run_user: www  # Nginx 运行时的用户名
+  source_root: /usr/local/src/opsvault-nginx  # Nginx 源码下载与编译路径
+  ssl_root: /data/ssl  # SSL 证书存储目录
+  systemd_unit_path: /lib/systemd/system/nginx.service  # Nginx systemd 服务文件路径
+  version: 1.31.0  # 准备编译的 Nginx 版本
+  vhost_dir: ""  # 虚拟主机配置文件目录（留空则默认为 {install_path}/conf/vhost） 需要配置全路径地址 如：/usr/local/nginx/conf/vhost 
+  www_root: /data/wwwroot  # 网站根目录
+  wwwlogs_root: /data/wwwlogs  # Nginx 访问与错误日志目录
 postgres:
-    image: postgres:15  # PostgreSQL Docker 镜像标签
-    password: ""  # PostgreSQL 密码（留空则自动生成随机密码）
-    port: 5432  # 映射到宿主机的 PostgreSQL 端口
+  image: postgres:15  # PostgreSQL Docker 镜像标签
+  password: ""  # PostgreSQL 密码（留空则自动生成随机密码）
+  port: 5432  # 映射到宿主机的 PostgreSQL 端口
 rabbitmq:
-    admin_pwd: ""  # RabbitMQ 管理员密码（留空则自动生成随机密码）
-    admin_user: admin  # RabbitMQ 管理员用户名
-    image: rabbitmq:3-management  # RabbitMQ Docker 镜像标签
-    port: 5672  # 映射到宿主机的 RabbitMQ AMQP 端口
-    ui_port: 15672  # 映射到宿主机的 RabbitMQ 管理后台端口
+  admin_pwd: ""  # RabbitMQ 管理员密码（留空则自动生成随机密码）
+  admin_user: admin  # RabbitMQ 管理员用户名
+  image: rabbitmq:3-management  # RabbitMQ Docker 镜像标签
+  port: 5672  # 映射到宿主机的 RabbitMQ AMQP 端口
+  ui_port: 15672  # 映射到宿主机的 RabbitMQ 管理后台端口
 redis:
-    image: redis:7-alpine  # Redis Docker 镜像标签
-    password: ""  # Redis 访问密码（留空则自动生成随机密码）
-    port: 6379  # 映射到宿主机的 Redis 端口
+  image: redis:7-alpine  # Redis Docker 镜像标签
+  password: ""  # Redis 访问密码（留空则自动生成随机密码）
+  port: 6379  # 映射到宿主机的 Redis 端口
 rocketmq:
-    broker_port: 10911  # 映射到宿主机的 RocketMQ Broker 端口
-    image: apache/rocketmq:5.3.0  # RocketMQ Docker 镜像标签
-    namesrv_port: 9876  # 映射到宿主机的 RocketMQ NameServer 端口
+  broker_port: 10911  # 映射到宿主机的 RocketMQ Broker 端口
+  image: apache/rocketmq:5.3.0  # RocketMQ Docker 镜像标签
+  namesrv_port: 9876  # 映射到宿主机的 RocketMQ NameServer 端口
 elk:
-    elasticsearch_image: "elasticsearch:8.12.0"  # Elasticsearch Docker 镜像标签
-    elasticsearch_port: 9200  # 映射到宿主机的 Elasticsearch REST API 端口
-    kibana_image: "kibana:8.12.0"  # Kibana Docker 镜像标签
-    kibana_port: 5601  # 映射到宿主机的 Kibana Web 界面端口
-    logstash_image: "logstash:8.12.0"  # Logstash Docker 镜像标签
-    logstash_port: 5044  # 映射到宿主机的 Logstash Beats 输入端口
-    es_java_opts: "-Xms512m -Xmx512m"  # Elasticsearch JVM 堆内存大小限制设置
+  elasticsearch_image: "elasticsearch:8.12.0"  # Elasticsearch Docker 镜像标签
+  elasticsearch_port: 9200  # 映射到宿主机的 Elasticsearch REST API 端口
+  kibana_image: "kibana:8.12.0"  # Kibana Docker 镜像标签
+  kibana_port: 5601  # 映射到宿主机的 Kibana Web 界面端口
+  logstash_image: "logstash:8.12.0"  # Logstash Docker 镜像标签
+  logstash_port: 5044  # 映射到宿主机的 Logstash Beats 输入端口
+  es_java_opts: "-Xms512m -Xmx512m"  # Elasticsearch JVM 堆内存大小限制设置
 jenkins:
-    image: "jenkins/jenkins:lts"  # Jenkins Docker 镜像标签
-    port: 8080  # 映射到宿主机的 Jenkins Web 端口
-    agent_port: 50000  # 映射到宿主机的 Jenkins Agent (JNLP) 端口
+  image: "jenkins/jenkins:lts"  # Jenkins Docker 镜像标签
+  port: 8080  # 映射到宿主机的 Jenkins Web 端口
+  agent_port: 50000  # 映射到宿主机的 Jenkins Agent (JNLP) 端口
 gitlab:
-    image: "gitlab/gitlab-ce:latest"  # GitLab CE Docker 镜像标签
-    port: 8082  # 映射到宿主机的 GitLab Web (HTTP) 端口
-    ssh_port: 2222  # 映射到宿主机的 GitLab SSH 端口
-    https_port: 8443  # 映射到宿主机的 GitLab HTTPS 端口
-ansible:
-    bin_path: "ansible"  # ansible 命令路径
-    playbook_bin_path: "ansible-playbook"  # ansible-playbook 命令路径
-    temp_dir: "./ansible_tmp"  # 临时清单文件生成目录
+  image: "gitlab/gitlab-ce:latest"  # GitLab CE Docker 镜像标签
+  port: 8082  # 映射到宿主机的 GitLab Web (HTTP) 端口
+  ssh_port: 2222  # 映射到宿主机的 GitLab SSH 端口
+  https_port: 8443  # 映射到宿主机的 GitLab HTTPS 端口
 

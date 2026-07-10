@@ -6,4 +6,7 @@
 OpsVault
 bin/*
 .agent
+*ansible.yaml
+configs/ansible.*.yaml
+!configs/ansible.example.yaml
 ansible_tmp/

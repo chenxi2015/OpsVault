@@ -1,0 +1,22 @@
+ansible:
+  bin_path: "ansible"
+  playbook_bin_path: "ansible-playbook"
+  temp_dir: "./ansible_tmp"
+  inventory:
+    groups:
+      - name: "db_servers"
+        hosts:
+          - ip: "192.168.1.10"
+            port: 22
+            user: "root"
+            ssh_password: ""                                 # SSH password (leave empty if using private key)
+            ssh_private_key: "/path/to/your/id_rsa"          # Absolute path to private key
+            python_interpreter: "/usr/bin/python3"          # Path to remote python interpreter
+      - name: "web_servers"
+        hosts:
+          - ip: "192.168.1.11"
+            port: 22
+            user: "root"
+            ssh_password: ""
+            ssh_private_key: "/path/to/your/id_rsa"
+            python_interpreter: ""

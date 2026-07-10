@@ -11,11 +11,12 @@ import (
 
 // HostConfig defines the SSH connection details for a remote host.
 type HostConfig struct {
-	IP            string `mapstructure:"ip"`
-	Port          int    `mapstructure:"port"`
-	User          string `mapstructure:"user"`
-	SSHPrivateKey string `mapstructure:"ssh_private_key"`
-	SSHPassword   string `mapstructure:"ssh_password"`
+	IP                string `mapstructure:"ip"`
+	Port              int    `mapstructure:"port"`
+	User              string `mapstructure:"user"`
+	SSHPrivateKey     string `mapstructure:"ssh_private_key"`
+	SSHPassword       string `mapstructure:"ssh_password"`
+	PythonInterpreter string `mapstructure:"python_interpreter"`
 }
 
 // GroupConfig represents a group of hosts.
@@ -91,6 +92,9 @@ func GenerateInventoryFile(cfg *Config) (string, error) {
 			}
 			if host.SSHPassword != "" {
 				line += fmt.Sprintf(" ansible_ssh_pass=%s", host.SSHPassword)
+			}
+			if host.PythonInterpreter != "" {
+				line += fmt.Sprintf(" ansible_python_interpreter=%s", host.PythonInterpreter)
 			}
 			// Strict host key checking disable to prevent interactive prompts
 			line += " ansible_ssh_common_args='-o StrictHostKeyChecking=no'"

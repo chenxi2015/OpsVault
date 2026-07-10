@@ -130,20 +130,6 @@ func initConfig() error {
 			return fmt.Errorf("read config: %w", err)
 		}
 	}
-
-	// Try to merge optional private ansible.yaml
-	ansibleCfg := viper.New()
-	ansibleCfg.SetConfigType("yaml")
-	ansibleCfg.SetConfigName("ansible")
-	ansibleCfg.AddConfigPath("./configs")
-	ansibleCfg.AddConfigPath(".")
-	if home, err := os.UserHomeDir(); err == nil {
-		ansibleCfg.AddConfigPath(filepath.Join(home, ".opsvault"))
-	}
-	if err := ansibleCfg.ReadInConfig(); err == nil {
-		_ = config.MergeConfigMap(ansibleCfg.AllSettings())
-	}
-
 	return nil
 }
 
