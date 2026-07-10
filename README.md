@@ -120,30 +120,61 @@ go build ./...
     brew install ansible
     ```
 *   **受控远程服务器**：只需开启 SSH 且内置 Python，**无需**安装任何 Ansible 代理或客户端。
-*   **配置主机清单**：在 `configs/default.yaml` 的 `ansible` 模块中填入服务器的分组及 SSH 凭证（密码或私钥）：
+*   **配置主机清单**：
+    
+    Ansible 使用独立的配置文件。首先需要将示例配置 `configs/ansible.example.yaml` 复制为 `configs/ansible.yaml`：
+    
+    ```bash
+    cp configs/ansible.example.yaml configs/ansible.yaml
+    ```
+    
+    然后在 `configs/ansible.yaml` 中配置远程主机组、IP、SSH端口、账号及密码/私钥：
+    
     ```yaml
     ansible:
-        bin_path: "ansible"
-        playbook_bin_path: "ansible-playbook"
-        temp_dir: "/data/opsvault/ansible/tmp"  # 临时清单文件生成目录
-        inventory:
-            groups:
-                - name: "my_servers"
-                  hosts:
-                    - ip: "192.168.1.101"
-                      port: 22
-                      user: "root"
-                      ssh_private_key: "/Users/yourname/.ssh/id_rsa"
-                    - ip: "192.168.1.102"
-                      port: 22
-                      user: "root"
-                      ssh_password: "YourSecurePassword"
+      bin_path: "ansible"
+      playbook_bin_path: "ansible-playbook"
+      temp_dir: "./ansible_tmp"                     # 临时清单文件生成目录
+      inventory:
+        groups:
+          - name: "db_servers"
+            hosts:
+              - ip: "192.168.1.10"
+                port: 22
+                user: "root"
+                ssh_password: "YourPassword"         # 使用密码登录时填入
+                ssh_private_key: "/Users/yourname/.ssh/id_rsa" # 使用私钥登录时填入绝对路径
+                python_interpreter: "/usr/bin/python3"         # 远程 Python 解释器路径
     ```
+
+### 1.2 多环境配置与切换
+
+Ansible 命令组支持多环境配置，通过 `-e` 或 `--env` 参数指定环境：
+
+1. **测试环境配置**：
+   复制为 `configs/ansible.test.yaml` 并填写测试机资产：
+   ```bash
+   cp configs/ansible.example.yaml configs/ansible.test.yaml
+   ```
+   使用 `-e test` 执行命令：
+   ```bash
+   opsvault ansible ping -e test --group db_servers
+   ```
+
+2. **生产环境配置**：
+   复制为 `configs/ansible.prod.yaml` 并填写生产机资产：
+   ```bash
+   cp configs/ansible.example.yaml configs/ansible.prod.yaml
+   ```
+   使用 `-e prod` 执行命令：
+   ```bash
+   opsvault ansible ping -e prod --group db_servers
+   ```
 
 > [!IMPORTANT]
 > **关于 macOS 控制端的写权限说明**：
-> 默认的临时目录为 `/data/opsvault/ansible/tmp`。在 macOS 上根目录 `/data` 可能是只读的，这会导致报错：`mkdir /data: read-only file system`。
-> **解决方法**：请将 `configs/default.yaml` 里的 `ansible.temp_dir` 修改为本地可写目录（如 `./ansible_tmp` 或 `/tmp/ansible`）。
+> 默认的临时目录如果配置为 `/data/opsvault/ansible/tmp`，而在 macOS 上根目录 `/data` 可能是只读的，会导致报错：`mkdir /data: read-only file system`。
+> **解决方法**：请在对应的配置文件（如 `configs/ansible.yaml`）中，将 `ansible.temp_dir` 修改为本地可写目录（如 `./ansible_tmp` 或 `/tmp/ansible`）。
 
 ### 2. 批量运维命令示例
 
