@@ -6,3 +6,4 @@
 OpsVault
 bin/*
 .agent
+ansible_tmp/

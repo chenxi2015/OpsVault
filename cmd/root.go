@@ -125,9 +125,23 @@ func initConfig() error {
 	if err != nil {
 		var configNotFound viper.ConfigFileNotFoundError
 		if errors.As(err, &configNotFound) && cfgFile == "" {
-			return nil
+			// fallback to read optional private ansible configuration even if default config not found
+		} else {
+			return fmt.Errorf("read config: %w", err)
 		}
-		return fmt.Errorf("read config: %w", err)
+	}
+
+	// Try to merge optional private ansible.yaml
+	ansibleCfg := viper.New()
+	ansibleCfg.SetConfigType("yaml")
+	ansibleCfg.SetConfigName("ansible")
+	ansibleCfg.AddConfigPath("./configs")
+	ansibleCfg.AddConfigPath(".")
+	if home, err := os.UserHomeDir(); err == nil {
+		ansibleCfg.AddConfigPath(filepath.Join(home, ".opsvault"))
+	}
+	if err := ansibleCfg.ReadInConfig(); err == nil {
+		_ = config.MergeConfigMap(ansibleCfg.AllSettings())
 	}
 
 	return nil
