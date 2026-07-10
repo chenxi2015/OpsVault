@@ -1,5 +1,5 @@
 backup:
-	storage_path: /data/opsvault/bak  # 配置文件备份存储路径
+  storage_path: /data/opsvault/bak  # 配置文件备份存储路径
 docker:
   bind_ip: 0.0.0.0  # 容器端口在宿主机上绑定的IP地址
   cidr: 172.28.0.0/16  # 专用桥接网络的 CIDR 网段
