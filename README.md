@@ -108,6 +108,67 @@ go build ./...
 - TUI 与实时驱动状态联动
 - 更细粒度测试覆盖
 
+## Ansible 批量多机运维命令 (ansible)
+
+`opsvault ansible` 子命令组允许您从本地控制端（如您的 Mac 笔记本）批量对多台远程服务器进行环境测试、Shell 命令执行、多机系统巡检以及中间件一键部署。
+
+### 1. 准备工作
+
+*   **控制机 (如 Mac 笔记本)**：需要安装 `ansible` 和 `ansible-playbook`。
+    ```bash
+    # 在 macOS 上使用 Homebrew 安装
+    brew install ansible
+    ```
+*   **受控远程服务器**：只需开启 SSH 且内置 Python，**无需**安装任何 Ansible 代理或客户端。
+*   **配置主机清单**：在 `configs/default.yaml` 的 `ansible` 模块中填入服务器的分组及 SSH 凭证（密码或私钥）：
+    ```yaml
+    ansible:
+        bin_path: "ansible"
+        playbook_bin_path: "ansible-playbook"
+        temp_dir: "/data/opsvault/ansible/tmp"  # 临时清单文件生成目录
+        inventory:
+            groups:
+                - name: "my_servers"
+                  hosts:
+                    - ip: "192.168.1.101"
+                      port: 22
+                      user: "root"
+                      ssh_private_key: "/Users/yourname/.ssh/id_rsa"
+                    - ip: "192.168.1.102"
+                      port: 22
+                      user: "root"
+                      ssh_password: "YourSecurePassword"
+    ```
+
+> [!IMPORTANT]
+> **关于 macOS 控制端的写权限说明**：
+> 默认的临时目录为 `/data/opsvault/ansible/tmp`。在 macOS 上根目录 `/data` 可能是只读的，这会导致报错：`mkdir /data: read-only file system`。
+> **解决方法**：请将 `configs/default.yaml` 里的 `ansible.temp_dir` 修改为本地可写目录（如 `./ansible_tmp` 或 `/tmp/ansible`）。
+
+### 2. 批量运维命令示例
+
+*   **批量连通性测试 (Ping)**：
+    ```bash
+    # 测试所有主机的 SSH 连通性
+    opsvault ansible ping --group my_servers
+    ```
+*   **批量执行临时 Shell 命令 (Exec)**：
+    ```bash
+    # 在受控机器上并发执行 ad-hoc 命令
+    opsvault ansible exec --cmd "uptime" --group my_servers
+    ```
+*   **多机环境巡检 (Doctor)**：
+    获取远程节点的负载、内存、磁盘以及 Docker/Nginx 服务运行状态，并在终端渲染出 Lipgloss 漂亮的统计表格：
+    ```bash
+    opsvault ansible doctor --group my_servers
+    ```
+*   **批量一键部署中间件 (Deploy)**：
+    通过 Ansible Playbook 批量向远程机器部署指定中间件（支持 docker、mysql、redis、rabbitmq）：
+    ```bash
+    # 远程批量拉取并部署 Redis 容器，包含专属网桥与持久化挂载
+    opsvault ansible deploy --service redis --group my_servers
+    ```
+
 ## TUI 运维工作台说明
 
 使用 `opsvault tui` 命令即可启动全交互式的 OpsVault 运维控制台。

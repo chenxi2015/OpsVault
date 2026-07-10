@@ -66,4 +66,21 @@ gitlab:
     port: 8082  # 映射到宿主机的 GitLab Web (HTTP) 端口
     ssh_port: 2222  # 映射到宿主机的 GitLab SSH 端口
     https_port: 8443  # 映射到宿主机的 GitLab HTTPS 端口
-
+ansible:
+    bin_path: "ansible"  # ansible 命令路径
+    playbook_bin_path: "ansible-playbook"  # ansible-playbook 命令路径
+    temp_dir: "./ansible_tmp"  # 临时清单文件生成目录
+    inventory:
+        groups:
+            - name: "db_servers"
+              hosts:
+                - ip: "127.0.0.1"
+                  port: 22
+                  user: "root"
+                  ssh_private_key: "/root/.ssh/id_rsa"
+            - name: "web_servers"
+              hosts:
+                - ip: "127.0.0.1"
+                  port: 22
+                  user: "root"
+                  ssh_private_key: "/root/.ssh/id_rsa"

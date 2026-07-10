@@ -7,15 +7,16 @@ import (
 	"path/filepath"
 	"strings"
 
+	ansiblecmd "OpsVault/cmd/ansible"
+	"OpsVault/cmd/elk"
+	"OpsVault/cmd/gitlab"
+	"OpsVault/cmd/jenkins"
 	"OpsVault/cmd/mysql"
 	"OpsVault/cmd/nginx"
 	"OpsVault/cmd/postgres"
 	"OpsVault/cmd/rabbitmq"
 	"OpsVault/cmd/redis"
 	"OpsVault/cmd/rocketmq"
-	"OpsVault/cmd/elk"
-	"OpsVault/cmd/jenkins"
-	"OpsVault/cmd/gitlab"
 	"OpsVault/internal/driver"
 	"OpsVault/pkg/dockercli"
 	"OpsVault/pkg/logger"
@@ -97,6 +98,7 @@ func init() {
 	rootCmd.AddCommand(jenkins.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(gitlab.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(newBakCommand(config))
+	rootCmd.AddCommand(ansiblecmd.NewCommand(config))
 }
 
 func initConfig() error {
@@ -207,6 +209,10 @@ func applyDefaultConfig(v *viper.Viper) {
 
 	v.SetDefault("log.storage_path", "/data/opsvault/logs")
 	v.SetDefault("backup.storage_path", "/data/opsvault/bak")
+
+	v.SetDefault("ansible.bin_path", "ansible")
+	v.SetDefault("ansible.playbook_bin_path", "ansible-playbook")
+	v.SetDefault("ansible.temp_dir", "/data/opsvault/ansible/tmp")
 }
 
 func newDockerClient() (*client.Client, error) {
