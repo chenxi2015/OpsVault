@@ -509,6 +509,156 @@ var PlaybookTemplates = map[string]string{
         state: started
         enabled: yes
 `,
+
+	"push": `---
+- name: Push OpsVault binary and config to target nodes
+  hosts: {{ .TargetGroup }}
+  become: yes
+  tasks:
+    - name: Ensure target bin and configs directories exist
+      file:
+        path: "{{ "{{" }} item {{ "}}" }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ .DataRoot }}/bin"
+        - "{{ .DataRoot }}/configs"
+
+    - name: Copy OpsVault executable binary
+      copy:
+        src: "{{ .BinaryPath }}"
+        dest: "{{ .DataRoot }}/bin/opsvault"
+        mode: '0755'
+
+    - name: Copy default configuration file
+      copy:
+        src: "{{ .ConfigPath }}"
+        dest: "{{ .DataRoot }}/configs/default.yaml"
+        mode: '0644'
+
+    - name: Create global symlink for opsvault in /usr/local/bin
+      file:
+        src: "{{ .DataRoot }}/bin/opsvault"
+        dest: /usr/local/bin/opsvault
+        state: link
+        force: yes
+`,
+}
+
+// UninstallTemplates contains built-in ansible playbooks for uninstallation and purging.
+var UninstallTemplates = map[string]string{
+	"mysql": `---
+- name: Uninstall MySQL Docker Service
+  hosts: {{ .TargetGroup }}
+  become: yes
+  tasks:
+    - name: Stop and remove MySQL container
+      shell: "docker rm -f {{ .NamePrefix }}-mysql || true"
+
+{{- if .Purge }}
+    - name: Purge MySQL data directory
+      file:
+        path: "{{ .DataRoot }}/mysql"
+        state: absent
+{{- end }}
+`,
+
+	"redis": `---
+- name: Uninstall Redis Docker Service
+  hosts: {{ .TargetGroup }}
+  become: yes
+  tasks:
+    - name: Stop and remove Redis container
+      shell: "docker rm -f {{ .NamePrefix }}-redis || true"
+
+{{- if .Purge }}
+    - name: Purge Redis data directory
+      file:
+        path: "{{ .DataRoot }}/redis"
+        state: absent
+{{- end }}
+`,
+
+	"rabbitmq": `---
+- name: Uninstall RabbitMQ Docker Service
+  hosts: {{ .TargetGroup }}
+  become: yes
+  tasks:
+    - name: Stop and remove RabbitMQ container
+      shell: "docker rm -f {{ .NamePrefix }}-rabbitmq || true"
+
+{{- if .Purge }}
+    - name: Purge RabbitMQ data directory
+      file:
+        path: "{{ .DataRoot }}/rabbitmq"
+        state: absent
+{{- end }}
+`,
+
+	"nginx": `---
+- name: Uninstall Nginx Binary Service
+  hosts: {{ .TargetGroup }}
+  become: yes
+  tasks:
+    - name: Stop Nginx systemd service
+      shell: "systemctl stop nginx || true"
+
+    - name: Disable and remove Nginx systemd service
+      shell: |
+        systemctl disable nginx || true
+        rm -f /lib/systemd/system/nginx.service
+        systemctl daemon-reload
+
+    - name: Remove Nginx installation directory
+      file:
+        path: "{{ .NginxInstallPath }}"
+        state: absent
+
+{{- if .Purge }}
+    - name: Purge Nginx website root directory
+      file:
+        path: "{{ .NginxWWWRoot }}"
+        state: absent
+
+    - name: Purge Nginx SSL certificate directory
+      file:
+        path: "{{ .NginxSSLRoot }}"
+        state: absent
+
+    - name: Purge Nginx logs directory
+      file:
+        path: "{{ .NginxWWWLogsRoot }}"
+        state: absent
+{{- end }}
+`,
+
+	"docker": `---
+- name: Uninstall Docker Engine
+  hosts: {{ .TargetGroup }}
+  become: yes
+  tasks:
+    - name: Stop and disable Docker service
+      systemd:
+        name: docker
+        state: stopped
+        enabled: no
+      ignore_errors: yes
+
+    - name: Remove Docker CE packages
+      yum:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: absent
+
+{{- if .Purge }}
+    - name: Purge Docker system root and opsvault network
+      shell: |
+        rm -rf /var/lib/docker
+        rm -rf /etc/docker
+{{- end }}
+`,
 }
 
 // PlaybookVars represents variables to inject into playbooks.
@@ -519,6 +669,10 @@ type PlaybookVars struct {
 	CIDR              string
 	NamePrefix        string
 	RegistryMirrors   []string
+	BinaryPath        string
+	ConfigPath        string
+	Purge             bool
+	ServiceName       string
 	MySQLImage        string
 	MySQLPort         int
 	MySQLRootPassword string
@@ -634,6 +788,56 @@ func GeneratePlaybookFile(tempDir string, serviceName string, vars PlaybookVars)
 	tempFile := filepath.Join(tempDir, fmt.Sprintf("%s_playbook.yml", serviceName))
 	if err := os.WriteFile(tempFile, buf.Bytes(), 0600); err != nil {
 		return "", fmt.Errorf("failed to write playbook file: %w", err)
+	}
+
+	return tempFile, nil
+}
+
+// GenerateUninstallPlaybookFile parses the uninstall playbook template and writes it to a temporary file.
+func GenerateUninstallPlaybookFile(tempDir string, serviceName string, vars PlaybookVars) (string, error) {
+	if vars.TargetGroup == "" {
+		vars.TargetGroup = "all"
+	}
+	if serviceName == "nginx" && vars.NginxInstallPath == "" {
+		vars.NginxInstallPath = "/usr/local/nginx"
+	}
+	if serviceName == "nginx" && vars.NginxWWWRoot == "" {
+		vars.NginxWWWRoot = "/data/wwwroot"
+	}
+	if serviceName == "nginx" && vars.NginxSSLRoot == "" {
+		vars.NginxSSLRoot = "/data/ssl"
+	}
+	if serviceName == "nginx" && vars.NginxWWWLogsRoot == "" {
+		vars.NginxWWWLogsRoot = "/data/wwwlogs"
+	}
+
+	tmplStr, exists := UninstallTemplates[serviceName]
+	if !exists {
+		return "", fmt.Errorf("uninstall playbook template for service %s not found", serviceName)
+	}
+
+	funcMap := template.FuncMap{
+		"indent": indentLines,
+		"join":   strings.Join,
+	}
+
+	tmpl, err := template.New(serviceName + "_uninstall").Funcs(funcMap).Parse(tmplStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse uninstall playbook template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, vars); err != nil {
+		return "", fmt.Errorf("failed to execute uninstall playbook template: %w", err)
+	}
+
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create temp dir %s: %w", tempDir, err)
+	}
+
+	tempFile := filepath.Join(tempDir, fmt.Sprintf("%s_uninstall_playbook.yml", serviceName))
+	if err := os.WriteFile(tempFile, buf.Bytes(), 0600); err != nil {
+		return "", fmt.Errorf("failed to write uninstall playbook file: %w", err)
 	}
 
 	return tempFile, nil
