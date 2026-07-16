@@ -211,18 +211,42 @@ func (i *nginxInstaller) prepareDirectories() error {
 }
 
 func (i *nginxInstaller) downloadSources() error {
-	sources := map[string]string{
-		i.plan.nginxArchive():   configString(i.plan.config, "nginx.source_urls.nginx", "https://nginx.org/download/"+i.plan.nginxArchive()),
-		i.plan.pcreArchive():    configString(i.plan.config, "nginx.source_urls.pcre", "https://sourceforge.net/projects/pcre/files/pcre/"+i.plan.pcreVersion+"/"+i.plan.pcreArchive()+"/download"),
-		i.plan.opensslArchive(): configString(i.plan.config, "nginx.source_urls.openssl", versionutil.OpenSSLSourceURL(i.plan.opensslVersion)),
+	opensslCandidateURLs := versionutil.GetOpenSSLDownloadURLs(i.plan.opensslVersion)
+	if customURL := configString(i.plan.config, "nginx.source_urls.openssl", ""); customURL != "" {
+		opensslCandidateURLs = append([]string{customURL}, opensslCandidateURLs...)
 	}
-	for filename, sourceURL := range sources {
-		target := filepath.Join(i.plan.sourceRoot, filename)
-		if info, err := os.Stat(target); err == nil && info.Size() > 0 {
+
+	sources := []struct {
+		filename string
+		urls     []string
+	}{
+		{
+			filename: i.plan.nginxArchive(),
+			urls: []string{
+				configString(i.plan.config, "nginx.source_urls.nginx", "https://nginx.org/download/"+i.plan.nginxArchive()),
+				"https://mirrors.sohu.com/nginx/" + i.plan.nginxArchive(),
+			},
+		},
+		{
+			filename: i.plan.pcreArchive(),
+			urls: []string{
+				configString(i.plan.config, "nginx.source_urls.pcre", "https://sourceforge.net/projects/pcre/files/pcre/"+i.plan.pcreVersion+"/"+i.plan.pcreArchive()+"/download"),
+				"https://mirrors.aliyun.com/macports/distfiles/pcre/" + i.plan.pcreArchive(),
+			},
+		},
+		{
+			filename: i.plan.opensslArchive(),
+			urls:     opensslCandidateURLs,
+		},
+	}
+
+	for _, item := range sources {
+		target := filepath.Join(i.plan.sourceRoot, item.filename)
+		if info, err := os.Stat(target); err == nil && info.Size() > 1000000 {
 			continue
 		}
-		if err := downloadFile(target, sourceURL); err != nil {
-			return err
+		if err := downloadFile(target, item.urls...); err != nil {
+			return fmt.Errorf("failed to download %s: %w", item.filename, err)
 		}
 	}
 	return nil
@@ -329,32 +353,70 @@ func (i *nginxInstaller) writeRuntimeFiles() error {
 	return nil
 }
 
-func downloadFile(target, sourceURL string) error {
-	client := http.Client{Timeout: 30 * time.Minute}
-	resp, err := client.Get(sourceURL)
-	if err != nil {
-		return fmt.Errorf("download %s: %w", sourceURL, err)
+func downloadFile(target string, sourceURLs ...string) error {
+	var lastErr error
+	for _, sourceURL := range sourceURLs {
+		if sourceURL == "" {
+			continue
+		}
+		log.Printf("[info] downloading %s from %s...", filepath.Base(target), sourceURL)
+		if curlPath, err := exec.LookPath("curl"); err == nil {
+			cmd := exec.Command(curlPath, "-f", "-L", "-C", "-", "--retry", "5", "--retry-delay", "2", "--connect-timeout", "15", "-sS", "-o", target, sourceURL)
+			if output, err := cmd.CombinedOutput(); err == nil {
+				return nil
+			} else {
+				lastErr = fmt.Errorf("curl download %s: %w (%s)", sourceURL, err, string(output))
+				log.Printf("[warn] %v, trying next URL/method...", lastErr)
+			}
+		} else if wgetPath, err := exec.LookPath("wget"); err == nil {
+			cmd := exec.Command(wgetPath, "-c", "--tries=5", "--timeout=30", "-q", "-O", target, sourceURL)
+			if output, err := cmd.CombinedOutput(); err == nil {
+				return nil
+			} else {
+				lastErr = fmt.Errorf("wget download %s: %w (%s)", sourceURL, err, string(output))
+				log.Printf("[warn] %v, trying next URL/method...", lastErr)
+			}
+		}
+
+		// Fallback to Go standard http client
+		client := http.Client{Timeout: 30 * time.Minute}
+		resp, err := client.Get(sourceURL)
+		if err != nil {
+			lastErr = fmt.Errorf("http download %s: %w", sourceURL, err)
+			continue
+		}
+		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+			resp.Body.Close()
+			lastErr = fmt.Errorf("http download %s: unexpected status %s", sourceURL, resp.Status)
+			continue
+		}
+		tmp := target + ".tmp"
+		file, err := os.Create(tmp)
+		if err != nil {
+			resp.Body.Close()
+			lastErr = err
+			continue
+		}
+		_, copyErr := io.Copy(file, resp.Body)
+		resp.Body.Close()
+		closeErr := file.Close()
+		if copyErr != nil {
+			_ = os.Remove(tmp)
+			lastErr = copyErr
+			continue
+		}
+		if closeErr != nil {
+			_ = os.Remove(tmp)
+			lastErr = closeErr
+			continue
+		}
+		if err := os.Rename(tmp, target); err == nil {
+			return nil
+		} else {
+			lastErr = err
+		}
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("download %s: unexpected status %s", sourceURL, resp.Status)
-	}
-	tmp := target + ".tmp"
-	file, err := os.Create(tmp)
-	if err != nil {
-		return err
-	}
-	_, copyErr := io.Copy(file, resp.Body)
-	closeErr := file.Close()
-	if copyErr != nil {
-		_ = os.Remove(tmp)
-		return copyErr
-	}
-	if closeErr != nil {
-		_ = os.Remove(tmp)
-		return closeErr
-	}
-	return os.Rename(tmp, target)
+	return fmt.Errorf("all download methods and mirrors failed for %s: last error: %v", filepath.Base(target), lastErr)
 }
 
 // toNginxConf converts the install plan to the shared nginxconf.Config used

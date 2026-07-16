@@ -121,7 +121,10 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 					v.GetString("nginx.openssl_version"),
 					"3.0.15",
 				)
-				vars.NginxOpenSSLURL = versionutil.OpenSSLSourceURL(vars.NginxOpenSSLVersion)
+				vars.NginxOpenSSLURLs = versionutil.GetOpenSSLDownloadURLs(vars.NginxOpenSSLVersion)
+				if len(vars.NginxOpenSSLURLs) > 0 {
+					vars.NginxOpenSSLURL = vars.NginxOpenSSLURLs[0]
+				}
 				vars.NginxInstallPath = v.GetString("nginx.install_path")
 				vars.NginxSourceRoot = v.GetString("nginx.source_root")
 				vars.NginxWWWRoot = v.GetString("nginx.www_root")

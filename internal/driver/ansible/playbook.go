@@ -252,11 +252,23 @@ var PlaybookTemplates = map[string]string{
         - "{{ "{{" }} wwwlogs_root {{ "}}" }}"
 
     - name: Download PCRE source
-      get_url:
-        url: "https://sourceforge.net/projects/pcre/files/pcre/{{ "{{" }} pcre_version {{ "}}" }}/pcre-{{ "{{" }} pcre_version {{ "}}" }}.tar.gz"
-        dest: "{{ "{{" }} source_root {{ "}}" }}/pcre-{{ "{{" }} pcre_version {{ "}}" }}.tar.gz"
-        validate_certs: no
-        timeout: 120
+      shell: |
+        DEST="{{ "{{" }} source_root {{ "}}" }}/pcre-{{ "{{" }} pcre_version {{ "}}" }}.tar.gz"
+        if [ -f "$DEST" ] && [ $(stat -c%s "$DEST" 2>/dev/null || stat -f%z "$DEST" 2>/dev/null || echo 0) -gt 1000000 ]; then
+          echo "PCRE source already downloaded ($DEST)."
+          exit 0
+        fi
+        for url in "https://sourceforge.net/projects/pcre/files/pcre/{{ "{{" }} pcre_version {{ "}}" }}/pcre-{{ "{{" }} pcre_version {{ "}}" }}.tar.gz/download" "https://mirrors.aliyun.com/macports/distfiles/pcre/pcre-{{ "{{" }} pcre_version {{ "}}" }}.tar.gz"; do
+          echo "Downloading PCRE from mirror: $url"
+          if curl -f -L -C - --retry 5 --retry-delay 2 --connect-timeout 15 -sS -o "$DEST" "$url" || wget -c --tries=5 --timeout=30 -q -O "$DEST" "$url"; then
+            echo "Successfully downloaded PCRE from $url"
+            exit 0
+          fi
+        done
+        echo "Failed to download PCRE source from all mirrors" >&2
+        exit 1
+      args:
+        executable: /bin/bash
 
     - name: Extract PCRE source
       unarchive:
@@ -265,11 +277,26 @@ var PlaybookTemplates = map[string]string{
         remote_src: yes
 
     - name: Download OpenSSL source
-      get_url:
-        url: "{{ "{{" }} openssl_url {{ "}}" }}"
-        dest: "{{ "{{" }} source_root {{ "}}" }}/openssl-{{ "{{" }} openssl_version {{ "}}" }}.tar.gz"
-        validate_certs: no
-        timeout: 120
+      shell: |
+        DEST="{{ "{{" }} source_root {{ "}}" }}/openssl-{{ "{{" }} openssl_version {{ "}}" }}.tar.gz"
+        if [ -f "$DEST" ] && [ $(stat -c%s "$DEST" 2>/dev/null || stat -f%z "$DEST" 2>/dev/null || echo 0) -gt 10000000 ]; then
+          echo "OpenSSL source already downloaded ($DEST)."
+          exit 0
+        fi
+        for url in {{ join .NginxOpenSSLURLs " " }}; do
+          echo "Downloading OpenSSL from mirror: $url"
+          if curl -f -L -C - --retry 5 --retry-delay 2 --connect-timeout 15 -sS -o "$DEST" "$url"; then
+            echo "Successfully downloaded OpenSSL from $url"
+            exit 0
+          elif wget -c --tries=5 --timeout=30 -q -O "$DEST" "$url"; then
+            echo "Successfully downloaded OpenSSL from $url"
+            exit 0
+          fi
+        done
+        echo "Failed to download OpenSSL source from all mirror candidate URLs" >&2
+        exit 1
+      args:
+        executable: /bin/bash
 
     - name: Extract OpenSSL source
       unarchive:
@@ -278,11 +305,23 @@ var PlaybookTemplates = map[string]string{
         remote_src: yes
 
     - name: Download Nginx source
-      get_url:
-        url: "https://nginx.org/download/nginx-{{ "{{" }} nginx_version {{ "}}" }}.tar.gz"
-        dest: "{{ "{{" }} source_root {{ "}}" }}/nginx-{{ "{{" }} nginx_version {{ "}}" }}.tar.gz"
-        validate_certs: no
-        timeout: 120
+      shell: |
+        DEST="{{ "{{" }} source_root {{ "}}" }}/nginx-{{ "{{" }} nginx_version {{ "}}" }}.tar.gz"
+        if [ -f "$DEST" ] && [ $(stat -c%s "$DEST" 2>/dev/null || stat -f%z "$DEST" 2>/dev/null || echo 0) -gt 1000000 ]; then
+          echo "Nginx source already downloaded ($DEST)."
+          exit 0
+        fi
+        for url in "https://nginx.org/download/nginx-{{ "{{" }} nginx_version {{ "}}" }}.tar.gz" "https://mirrors.sohu.com/nginx/nginx-{{ "{{" }} nginx_version {{ "}}" }}.tar.gz"; do
+          echo "Downloading Nginx from mirror: $url"
+          if curl -f -L -C - --retry 5 --retry-delay 2 --connect-timeout 15 -sS -o "$DEST" "$url" || wget -c --tries=5 --timeout=30 -q -O "$DEST" "$url"; then
+            echo "Successfully downloaded Nginx from $url"
+            exit 0
+          fi
+        done
+        echo "Failed to download Nginx source from all mirrors" >&2
+        exit 1
+      args:
+        executable: /bin/bash
 
     - name: Extract Nginx source
       unarchive:
@@ -379,6 +418,7 @@ type PlaybookVars struct {
 	NginxPCREVersion     string
 	NginxOpenSSLVersion  string
 	NginxOpenSSLURL      string
+	NginxOpenSSLURLs     []string
 	NginxInstallPath     string
 	NginxSourceRoot      string
 	NginxWWWRoot         string
@@ -422,8 +462,11 @@ func GeneratePlaybookFile(tempDir string, serviceName string, vars PlaybookVars)
 	// Auto-populate pre-rendered nginx config contents from the shared package.
 	switch serviceName {
 	case "nginx":
-		if vars.NginxOpenSSLURL == "" && vars.NginxOpenSSLVersion != "" {
-			vars.NginxOpenSSLURL = versionutil.OpenSSLSourceURL(vars.NginxOpenSSLVersion)
+		if len(vars.NginxOpenSSLURLs) == 0 && vars.NginxOpenSSLVersion != "" {
+			vars.NginxOpenSSLURLs = versionutil.GetOpenSSLDownloadURLs(vars.NginxOpenSSLVersion)
+		}
+		if vars.NginxOpenSSLURL == "" && len(vars.NginxOpenSSLURLs) > 0 {
+			vars.NginxOpenSSLURL = vars.NginxOpenSSLURLs[0]
 		}
 		cfg := nginxconf.Config{
 			InstallPath:     vars.NginxInstallPath,
@@ -454,6 +497,7 @@ func GeneratePlaybookFile(tempDir string, serviceName string, vars PlaybookVars)
 	// Register custom template functions.
 	funcMap := template.FuncMap{
 		"indent": indentLines,
+		"join":   strings.Join,
 	}
 
 	tmpl, err := template.New(serviceName).Funcs(funcMap).Parse(tmplStr)

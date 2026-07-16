@@ -25,17 +25,36 @@ func ResolveOpenSSLVersion(ver, fallback string) string {
 	return ver
 }
 
-// OpenSSLSourceURL returns the GitHub Releases download URL for the given OpenSSL version.
-// Handles both 1.x tags (OpenSSL_1_1_1w) and 3.x tags (openssl-3.0.15).
-func OpenSSLSourceURL(version string) string {
+// GetOpenSSLDownloadURLs returns candidate download URLs for OpenSSL ordered by speed and stability for domestic/global servers.
+func GetOpenSSLDownloadURLs(version string) []string {
 	version = strings.TrimPrefix(version, "openssl-")
 	version = strings.TrimPrefix(version, "OpenSSL_")
+
+	var githubURL, opensslCdnURL string
 	if strings.HasPrefix(version, "1.") {
 		tag := "OpenSSL_" + strings.ReplaceAll(version, ".", "_")
-		return "https://github.com/openssl/openssl/releases/download/" + tag + "/openssl-" + version + ".tar.gz"
+		githubURL = "https://github.com/openssl/openssl/releases/download/" + tag + "/openssl-" + version + ".tar.gz"
+		opensslCdnURL = "https://www.openssl.org/source/old/1.1.1/openssl-" + version + ".tar.gz"
+	} else {
+		tag := "openssl-" + version
+		githubURL = "https://github.com/openssl/openssl/releases/download/" + tag + "/openssl-" + version + ".tar.gz"
+		opensslCdnURL = "https://www.openssl.org/source/openssl-" + version + ".tar.gz"
 	}
-	tag := "openssl-" + version
-	return "https://github.com/openssl/openssl/releases/download/" + tag + "/openssl-" + version + ".tar.gz"
+
+	return []string{
+		"https://ghproxy.net/" + githubURL,
+		opensslCdnURL,
+		githubURL,
+	}
+}
+
+// OpenSSLSourceURL returns the primary recommended download URL for OpenSSL.
+func OpenSSLSourceURL(version string) string {
+	urls := GetOpenSSLDownloadURLs(version)
+	if len(urls) > 0 {
+		return urls[0]
+	}
+	return ""
 }
 
 func fetchLatestOpenSSLVersion() (string, error) {
