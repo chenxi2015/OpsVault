@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	ansiblecmd "OpsVault/cmd/ansible"
@@ -19,6 +18,7 @@ import (
 	"OpsVault/cmd/rocketmq"
 	"OpsVault/internal/driver"
 	"OpsVault/pkg/dockercli"
+	"OpsVault/pkg/fileutil"
 	"OpsVault/pkg/logger"
 
 	"github.com/docker/docker/client"
@@ -109,15 +109,8 @@ func initConfig() error {
 		config.SetConfigFile(cfgFile)
 	} else {
 		config.SetConfigName("default")
-		config.AddConfigPath("./configs")
-		config.AddConfigPath(".")
-		if exePath, err := os.Executable(); err == nil {
-			exeDir := filepath.Dir(exePath)
-			config.AddConfigPath(filepath.Join(exeDir, "configs"))
-			config.AddConfigPath(exeDir)
-		}
-		if home, err := os.UserHomeDir(); err == nil {
-			config.AddConfigPath(filepath.Join(home, ".opsvault"))
+		for _, path := range fileutil.GetConfigSearchPaths() {
+			config.AddConfigPath(path)
 		}
 	}
 

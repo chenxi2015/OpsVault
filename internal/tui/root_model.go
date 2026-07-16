@@ -3,7 +3,6 @@ package tui
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 
 	"OpsVault/internal/driver"
 	"OpsVault/internal/system"
+	"OpsVault/pkg/fileutil"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -518,13 +518,8 @@ func (m *RootModel) handleShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					if m.config.ConfigFileUsed() != "" {
 						err = m.config.WriteConfig()
 					} else {
-						var targetPath string
-						if exePath, errExe := os.Executable(); errExe == nil {
-							targetPath = filepath.Join(filepath.Dir(exePath), "configs", "default.yaml")
-						} else {
-							targetPath = filepath.Join("configs", "default.yaml")
-						}
-						if errDir := os.MkdirAll(filepath.Dir(targetPath), 0755); errDir == nil {
+						targetPath := fileutil.GetDefaultWriteConfigPath()
+						if errDir := fileutil.EnsureDir(filepath.Dir(targetPath), 0755); errDir == nil {
 							err = m.config.WriteConfigAs(targetPath)
 							if err == nil {
 								m.config.SetConfigFile(targetPath)
