@@ -2,7 +2,6 @@ package binary
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -10,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -60,15 +58,7 @@ func newNginxInstaller(cfg *viper.Viper) *nginxInstaller {
 }
 
 func newNginxInstallPlan(cfg *viper.Viper) nginxInstallPlan {
-	opensslVer := configString(cfg, "nginx.openssl_version", "latest")
-	if opensslVer == "" || strings.EqualFold(opensslVer, "latest") {
-		resolved, err := resolveLatestOpenSSLVersion()
-		if err != nil {
-			log.Printf("[warn] failed to resolve latest OpenSSL version, falling back to 3.0.15: %v", err)
-			resolved = "3.0.15"
-		}
-		opensslVer = resolved
-	}
+	opensslVer := versionutil.ResolveOpenSSLVersion(configString(cfg, "nginx.openssl_version", "latest"), "3.0.15")
 
 	nginxVer := versionutil.ResolveNginxVersion(
 		configString(cfg, "nginx.version", "latest"),
@@ -224,7 +214,7 @@ func (i *nginxInstaller) downloadSources() error {
 	sources := map[string]string{
 		i.plan.nginxArchive():   configString(i.plan.config, "nginx.source_urls.nginx", "https://nginx.org/download/"+i.plan.nginxArchive()),
 		i.plan.pcreArchive():    configString(i.plan.config, "nginx.source_urls.pcre", "https://sourceforge.net/projects/pcre/files/pcre/"+i.plan.pcreVersion+"/"+i.plan.pcreArchive()+"/download"),
-		i.plan.opensslArchive(): configString(i.plan.config, "nginx.source_urls.openssl", opensslSourceURL(i.plan.opensslVersion)),
+		i.plan.opensslArchive(): configString(i.plan.config, "nginx.source_urls.openssl", versionutil.OpenSSLSourceURL(i.plan.opensslVersion)),
 	}
 	for filename, sourceURL := range sources {
 		target := filepath.Join(i.plan.sourceRoot, filename)
@@ -365,59 +355,6 @@ func downloadFile(target, sourceURL string) error {
 		return closeErr
 	}
 	return os.Rename(tmp, target)
-}
-
-// opensslSourceURL returns the GitHub Releases download URL for the given OpenSSL version.
-// Using GitHub directly is more stable than openssl.org which may redirect or 404.
-func opensslSourceURL(version string) string {
-	tag := "openssl-" + version
-	return "https://github.com/openssl/openssl/releases/download/" + tag + "/openssl-" + version + ".tar.gz"
-}
-
-// resolveLatestOpenSSLVersion queries the GitHub Releases API and returns the
-// latest stable OpenSSL 3.x version string (e.g. "3.5.0").
-func resolveLatestOpenSSLVersion() (string, error) {
-	log.Println("[info] resolving latest stable OpenSSL version from GitHub...")
-
-	type release struct {
-		TagName    string `json:"tag_name"`
-		Prerelease bool   `json:"prerelease"`
-		Draft      bool   `json:"draft"`
-	}
-
-	client := &http.Client{Timeout: 15 * time.Second}
-	req, _ := http.NewRequest(http.MethodGet,
-		"https://api.github.com/repos/openssl/openssl/releases?per_page=30", nil)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "OpsVault/1.0")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("github api request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("github api status: %s", resp.Status)
-	}
-
-	var releases []release
-	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
-		return "", fmt.Errorf("decode github response: %w", err)
-	}
-
-	// Match stable 3.x tags: openssl-3.x.y
-	re := regexp.MustCompile(`^openssl-(3\.\d+\.\d+)$`)
-	for _, r := range releases {
-		if r.Prerelease || r.Draft {
-			continue
-		}
-		if m := re.FindStringSubmatch(r.TagName); len(m) == 2 {
-			log.Printf("[info] resolved OpenSSL latest stable version: %s", m[1])
-			return m[1], nil
-		}
-	}
-	return "", fmt.Errorf("no stable OpenSSL 3.x release found in GitHub API response")
 }
 
 // toNginxConf converts the install plan to the shared nginxconf.Config used

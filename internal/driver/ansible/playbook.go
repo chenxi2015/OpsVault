@@ -12,13 +12,14 @@ import (
 	"OpsVault/pkg/nginxconf"
 	"OpsVault/pkg/rabbitmqconf"
 	"OpsVault/pkg/redisconf"
+	"OpsVault/pkg/versionutil"
 )
 
 // PlaybookTemplates contains built-in ansible playbooks.
 var PlaybookTemplates = map[string]string{
 	"docker": `---
 - name: Install and Setup Docker
-  hosts: all
+  hosts: {{ .TargetGroup }}
   become: yes
   tasks:
     - name: Check if Docker is installed
@@ -56,7 +57,7 @@ var PlaybookTemplates = map[string]string{
 
 	"mysql": `---
 - name: Deploy MySQL via Docker
-  hosts: all
+  hosts: {{ .TargetGroup }}
   become: yes
   tasks:
     - name: Create MySQL data and conf directories
@@ -71,7 +72,8 @@ var PlaybookTemplates = map[string]string{
     - name: Write my.cnf
       copy:
         dest: "{{ .DataRoot }}/mysql/conf/my.cnf"
-        content: {{ .MySQLMyCnf | indent 8 }}
+        content: |
+          {{ .MySQLMyCnf | indent 10 }}
         mode: '0644'
 
     - name: Create Docker bridge network if not exists
@@ -97,7 +99,7 @@ var PlaybookTemplates = map[string]string{
 
 	"redis": `---
 - name: Deploy Redis via Docker
-  hosts: all
+  hosts: {{ .TargetGroup }}
   become: yes
   tasks:
     - name: Create Redis data and conf directories
@@ -112,7 +114,8 @@ var PlaybookTemplates = map[string]string{
     - name: Write redis.conf
       copy:
         dest: "{{ .DataRoot }}/redis/conf/redis.conf"
-        content: {{ .RedisCnf | indent 8 }}
+        content: |
+          {{ .RedisCnf | indent 10 }}
         mode: '0644'
 
     - name: Create Docker bridge network if not exists
@@ -138,7 +141,7 @@ var PlaybookTemplates = map[string]string{
 
 	"rabbitmq": `---
 - name: Deploy RabbitMQ via Docker
-  hosts: all
+  hosts: {{ .TargetGroup }}
   become: yes
   tasks:
     - name: Create RabbitMQ data and conf directories
@@ -153,7 +156,8 @@ var PlaybookTemplates = map[string]string{
     - name: Write rabbitmq.conf
       copy:
         dest: "{{ .DataRoot }}/rabbitmq/conf/rabbitmq.conf"
-        content: {{ .RabbitMQConf | indent 8 }}
+        content: |
+          {{ .RabbitMQConf | indent 10 }}
         mode: '0644'
 
     - name: Create Docker bridge network if not exists
@@ -182,12 +186,13 @@ var PlaybookTemplates = map[string]string{
 	// nginx is deployed via binary driver (source compile), not Docker.
 	"nginx": `---
 - name: Deploy Nginx via source compile (Binary Driver)
-  hosts: all
+  hosts: {{ .TargetGroup }}
   become: yes
   vars:
     nginx_version: "{{ .NginxVersion }}"
     pcre_version: "{{ .NginxPCREVersion }}"
     openssl_version: "{{ .NginxOpenSSLVersion }}"
+    openssl_url: "{{ .NginxOpenSSLURL }}"
     install_path: "{{ .NginxInstallPath }}"
     source_root: "{{ .NginxSourceRoot }}"
     www_root: "{{ .NginxWWWRoot }}"
@@ -261,7 +266,7 @@ var PlaybookTemplates = map[string]string{
 
     - name: Download OpenSSL source
       get_url:
-        url: "https://github.com/openssl/openssl/releases/download/OpenSSL_{{ "{{" }} openssl_version | replace('.', '_') {{ "}}" }}/openssl-{{ "{{" }} openssl_version {{ "}}" }}.tar.gz"
+        url: "{{ "{{" }} openssl_url {{ "}}" }}"
         dest: "{{ "{{" }} source_root {{ "}}" }}/openssl-{{ "{{" }} openssl_version {{ "}}" }}.tar.gz"
         validate_certs: no
         timeout: 120
@@ -318,22 +323,26 @@ var PlaybookTemplates = map[string]string{
     - name: Write nginx.conf
       copy:
         dest: "{{ "{{" }} install_path {{ "}}" }}/conf/nginx.conf"
-        content: {{ .NginxBaseConfig | indent 8 }}
+        content: |
+          {{ .NginxBaseConfig | indent 10 }}
 
     - name: Write proxy.conf
       copy:
         dest: "{{ "{{" }} install_path {{ "}}" }}/conf/proxy.conf"
-        content: {{ .NginxProxyConfig | indent 8 }}
+        content: |
+          {{ .NginxProxyConfig | indent 10 }}
 
     - name: Write systemd unit file
       copy:
         dest: "{{ "{{" }} systemd_unit_path {{ "}}" }}"
-        content: {{ .NginxSystemdUnit | indent 8 }}
+        content: |
+          {{ .NginxSystemdUnit | indent 10 }}
 
     - name: Write logrotate config
       copy:
         dest: /etc/logrotate.d/nginx
-        content: {{ .NginxLogrotate | indent 8 }}
+        content: |
+          {{ .NginxLogrotate | indent 10 }}
 
     - name: Reload systemd daemon
       systemd:
@@ -349,6 +358,7 @@ var PlaybookTemplates = map[string]string{
 
 // PlaybookVars represents variables to inject into playbooks.
 type PlaybookVars struct {
+	TargetGroup       string
 	DataRoot          string
 	NetworkName       string
 	CIDR              string
@@ -368,6 +378,7 @@ type PlaybookVars struct {
 	NginxVersion         string
 	NginxPCREVersion     string
 	NginxOpenSSLVersion  string
+	NginxOpenSSLURL      string
 	NginxInstallPath     string
 	NginxSourceRoot      string
 	NginxWWWRoot         string
@@ -405,8 +416,15 @@ func indentLines(spaces int, s string) string {
 // populated from pkg/nginxconf so both the local binary driver and the Ansible
 // path write byte-for-byte identical configuration.
 func GeneratePlaybookFile(tempDir string, serviceName string, vars PlaybookVars) (string, error) {
+	if vars.TargetGroup == "" {
+		vars.TargetGroup = "all"
+	}
 	// Auto-populate pre-rendered nginx config contents from the shared package.
-	if serviceName == "nginx" {
+	switch serviceName {
+	case "nginx":
+		if vars.NginxOpenSSLURL == "" && vars.NginxOpenSSLVersion != "" {
+			vars.NginxOpenSSLURL = versionutil.OpenSSLSourceURL(vars.NginxOpenSSLVersion)
+		}
 		cfg := nginxconf.Config{
 			InstallPath:     vars.NginxInstallPath,
 			WWWRoot:         vars.NginxWWWRoot,
@@ -420,11 +438,11 @@ func GeneratePlaybookFile(tempDir string, serviceName string, vars PlaybookVars)
 		vars.NginxProxyConfig = nginxconf.RenderProxyConfig()
 		vars.NginxSystemdUnit = nginxconf.RenderSystemdUnit(cfg)
 		vars.NginxLogrotate = nginxconf.RenderLogrotate(cfg)
-	} else if serviceName == "mysql" {
+	case "mysql":
 		vars.MySQLMyCnf = mysqlconf.RenderMyCnf()
-	} else if serviceName == "redis" {
+	case "redis":
 		vars.RedisCnf = redisconf.RenderRedisCnf(vars.RedisPassword)
-	} else if serviceName == "rabbitmq" {
+	case "rabbitmq":
 		vars.RabbitMQConf = rabbitmqconf.RenderRabbitMQConf(vars.RabbitMQUser, vars.RabbitMQPwd)
 	}
 

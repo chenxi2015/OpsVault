@@ -45,11 +45,14 @@ func (e *Executor) RunAnsible(ctx context.Context, group string, module string, 
 	return nil
 }
 
-// RunPlaybook runs an ansible-playbook command.
-func (e *Executor) RunPlaybook(ctx context.Context, playbookPath string, extraVars map[string]string, stdout, stderr io.Writer) error {
+// RunPlaybook runs an ansible-playbook command on the specified target group.
+func (e *Executor) RunPlaybook(ctx context.Context, playbookPath string, group string, extraVars map[string]string, stdout, stderr io.Writer) error {
 	cmdArgs := []string{
 		"-i", e.InventoryPath,
 		playbookPath,
+	}
+	if group != "" && group != "all" {
+		cmdArgs = append(cmdArgs, "-l", group)
 	}
 
 	for k, v := range extraVars {

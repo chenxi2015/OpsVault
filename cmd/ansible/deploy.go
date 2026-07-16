@@ -42,6 +42,7 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 			// Prepare playbook variables from config
 			v := c.config
 			vars := ansible.PlaybookVars{
+				TargetGroup: group,
 				DataRoot:    v.GetString("docker.data_root"),
 				NetworkName: v.GetString("docker.network_name"),
 				CIDR:        v.GetString("docker.cidr"),
@@ -116,7 +117,11 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 					"1.26.2",
 				)
 				vars.NginxPCREVersion = v.GetString("nginx.pcre_version")
-				vars.NginxOpenSSLVersion = v.GetString("nginx.openssl_version")
+				vars.NginxOpenSSLVersion = versionutil.ResolveOpenSSLVersion(
+					v.GetString("nginx.openssl_version"),
+					"3.0.15",
+				)
+				vars.NginxOpenSSLURL = versionutil.OpenSSLSourceURL(vars.NginxOpenSSLVersion)
 				vars.NginxInstallPath = v.GetString("nginx.install_path")
 				vars.NginxSourceRoot = v.GetString("nginx.source_root")
 				vars.NginxWWWRoot = v.GetString("nginx.www_root")
@@ -130,7 +135,7 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 					vars.NginxPCREVersion = "8.45"
 				}
 				if vars.NginxOpenSSLVersion == "" {
-					vars.NginxOpenSSLVersion = "1.1.1w"
+					vars.NginxOpenSSLVersion = "3.0.15"
 				}
 				if vars.NginxInstallPath == "" {
 					vars.NginxInstallPath = "/usr/local/nginx"
@@ -173,8 +178,7 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 			}()
 
 			fmt.Printf("Executing playbook deployment on group: %s...\n", group)
-			// extraVars can be passed dynamically if needed, keeping it empty for now
-			err = exec.RunPlaybook(cmd.Context(), playbookFile, nil, os.Stdout, os.Stderr)
+			err = exec.RunPlaybook(cmd.Context(), playbookFile, group, nil, os.Stdout, os.Stderr)
 			if err != nil {
 				return fmt.Errorf("playbook execution failed: %w", err)
 			}
