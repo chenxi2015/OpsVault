@@ -4,7 +4,7 @@ BUILD_DIR=bin
 
 .PHONY: all build build-linux build-darwin-amd64 build-darwin-arm64 build-windows clean fmt vet run help
 
-all: build
+all: build build-linux
 
 # Help information
 help:

@@ -3,6 +3,9 @@ package ansiblecmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"OpsVault/internal/driver/ansible"
 
@@ -18,17 +21,40 @@ func (c *commandSet) newPushCommand() *cobra.Command {
 		Use:   "push",
 		Short: "Push OpsVault executable binary and default.yaml config to remote hosts",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Println("Running pre-command: make all...")
+			makeCmd := exec.CommandContext(cmd.Context(), "make", "all")
+			makeCmd.Stdout = os.Stdout
+			makeCmd.Stderr = os.Stderr
+			if err := makeCmd.Run(); err != nil {
+				return fmt.Errorf("pre-command 'make all' failed: %w", err)
+			}
+
+			// Convert binary path to absolute path so Ansible resolves it correctly from root directory
+			absBinPath, err := filepath.Abs(binPath)
+			if err != nil {
+				return fmt.Errorf("failed to get absolute path for binary %s: %w", binPath, err)
+			}
+			binPath = absBinPath
+
 			if _, err := os.Stat(binPath); err != nil {
-				if binPath == "./bin/opsvault-linux-amd64" {
-					if _, errFallback := os.Stat("./bin/opsvault"); errFallback == nil {
-						binPath = "./bin/opsvault"
+				if strings.HasSuffix(binPath, "/bin/opsvault-linux-amd64") || binPath == "./bin/opsvault-linux-amd64" {
+					fallbackBin := filepath.Join(filepath.Dir(binPath), "opsvault")
+					if _, errFallback := os.Stat(fallbackBin); errFallback == nil {
+						binPath = fallbackBin
 					} else {
-						return fmt.Errorf("binary file not found at %s (or ./bin/opsvault): please compile the Linux executable first using: GOOS=linux GOARCH=amd64 go build -o bin/opsvault-linux-amd64 main.go", binPath)
+						return fmt.Errorf("binary file not found at %s: please ensure 'make all' compiled the Linux executable", binPath)
 					}
 				} else {
 					return fmt.Errorf("binary file not found at %s: %w", binPath, err)
 				}
 			}
+
+			// Convert config path to absolute path so Ansible resolves it correctly from root directory
+			absCfgPath, err := filepath.Abs(cfgPath)
+			if err != nil {
+				return fmt.Errorf("failed to get absolute path for config %s: %w", cfgPath, err)
+			}
+			cfgPath = absCfgPath
 
 			if _, err := os.Stat(cfgPath); err != nil {
 				return fmt.Errorf("config file not found at %s: %w", cfgPath, err)
