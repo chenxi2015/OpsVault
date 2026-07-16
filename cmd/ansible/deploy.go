@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"OpsVault/internal/driver/ansible"
+	"OpsVault/pkg/versionutil"
 
 	"github.com/spf13/cobra"
 )
@@ -26,10 +27,10 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 
 			// Validate service support
 			switch service {
-			case "docker", "mysql", "redis", "rabbitmq":
+			case "docker", "mysql", "redis", "rabbitmq", "nginx":
 				// valid
 			default:
-				return fmt.Errorf("unsupported service: %s. Supported: docker, mysql, redis, rabbitmq", service)
+				return fmt.Errorf("unsupported service: %s. Supported: docker, mysql, redis, rabbitmq, nginx", service)
 			}
 
 			exec, cleanup, err := c.getExecutor()
@@ -109,6 +110,52 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 				if vars.RabbitMQPwd == "" {
 					vars.RabbitMQPwd = generateRandomPassword()
 				}
+			case "nginx":
+				vars.NginxVersion = versionutil.ResolveNginxVersion(
+					v.GetString("nginx.version"),
+					"1.26.2",
+				)
+				vars.NginxPCREVersion = v.GetString("nginx.pcre_version")
+				vars.NginxOpenSSLVersion = v.GetString("nginx.openssl_version")
+				vars.NginxInstallPath = v.GetString("nginx.install_path")
+				vars.NginxSourceRoot = v.GetString("nginx.source_root")
+				vars.NginxWWWRoot = v.GetString("nginx.www_root")
+				vars.NginxSSLRoot = v.GetString("nginx.ssl_root")
+				vars.NginxWWWLogsRoot = v.GetString("nginx.wwwlogs_root")
+				vars.NginxRunUser = v.GetString("nginx.run_user")
+				vars.NginxRunGroup = v.GetString("nginx.run_group")
+				vars.NginxSystemdUnitPath = v.GetString("nginx.systemd_unit_path")
+				// Apply defaults for fields not set in config
+				if vars.NginxPCREVersion == "" {
+					vars.NginxPCREVersion = "8.45"
+				}
+				if vars.NginxOpenSSLVersion == "" {
+					vars.NginxOpenSSLVersion = "1.1.1w"
+				}
+				if vars.NginxInstallPath == "" {
+					vars.NginxInstallPath = "/usr/local/nginx"
+				}
+				if vars.NginxSourceRoot == "" {
+					vars.NginxSourceRoot = "/usr/local/src/opsvault-nginx"
+				}
+				if vars.NginxWWWRoot == "" {
+					vars.NginxWWWRoot = "/data/wwwroot"
+				}
+				if vars.NginxSSLRoot == "" {
+					vars.NginxSSLRoot = "/data/ssl"
+				}
+				if vars.NginxWWWLogsRoot == "" {
+					vars.NginxWWWLogsRoot = "/data/wwwlogs"
+				}
+				if vars.NginxRunUser == "" {
+					vars.NginxRunUser = "www"
+				}
+				if vars.NginxRunGroup == "" {
+					vars.NginxRunGroup = "www"
+				}
+				if vars.NginxSystemdUnitPath == "" {
+					vars.NginxSystemdUnitPath = "/lib/systemd/system/nginx.service"
+				}
 			}
 
 			tempDir := v.GetString("ansible.temp_dir")
@@ -137,7 +184,7 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&service, "service", "s", "", "middleware service to deploy (docker, mysql, redis, rabbitmq)")
+	cmd.Flags().StringVarP(&service, "service", "s", "", "middleware service to deploy (docker, mysql, redis, rabbitmq, nginx)")
 	cmd.Flags().StringVarP(&group, "group", "g", "all", "target host group for deployment")
 	_ = cmd.MarkFlagRequired("service")
 

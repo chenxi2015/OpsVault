@@ -17,6 +17,8 @@ import (
 
 	"OpsVault/internal/system"
 	"OpsVault/pkg/fileutil"
+	"OpsVault/pkg/nginxconf"
+	"OpsVault/pkg/versionutil"
 
 	"github.com/spf13/viper"
 )
@@ -67,6 +69,12 @@ func newNginxInstallPlan(cfg *viper.Viper) nginxInstallPlan {
 		}
 		opensslVer = resolved
 	}
+
+	nginxVer := versionutil.ResolveNginxVersion(
+		configString(cfg, "nginx.version", "latest"),
+		"1.26.2",
+	)
+
 	return nginxInstallPlan{
 		sourceRoot:      configString(cfg, "nginx.source_root", "/usr/local/src/opsvault-nginx"),
 		installPath:     configString(cfg, "nginx.install_path", "/usr/local/nginx"),
@@ -75,7 +83,7 @@ func newNginxInstallPlan(cfg *viper.Viper) nginxInstallPlan {
 		wwwLogsRoot:     configString(cfg, "nginx.wwwlogs_root", "/data/wwwlogs"),
 		runUser:         configString(cfg, "nginx.run_user", "www"),
 		runGroup:        configString(cfg, "nginx.run_group", "www"),
-		version:         configString(cfg, "nginx.version", "1.31.0"),
+		version:         nginxVer,
 		pcreVersion:     configString(cfg, "nginx.pcre_version", "8.45"),
 		opensslVersion:  opensslVer,
 		modulesOptions:  cfg.GetStringSlice("nginx.modules_options"),
@@ -313,11 +321,12 @@ func restoreBackup(target, backup string) error {
 }
 
 func (i *nginxInstaller) writeRuntimeFiles() error {
+	cfg := i.plan.toNginxConf()
 	files := map[string]string{
-		filepath.Join(i.plan.installPath, "conf", "nginx.conf"): renderNginxBaseConfig(i.plan),
-		filepath.Join(i.plan.installPath, "conf", "proxy.conf"): renderNginxProxyConfig(),
-		i.plan.systemdUnitPath: renderNginxSystemdService(i.plan),
-		i.plan.logrotatePath:   renderNginxLogrotateConfig(i.plan),
+		filepath.Join(i.plan.installPath, "conf", "nginx.conf"): nginxconf.RenderBaseConfig(cfg),
+		filepath.Join(i.plan.installPath, "conf", "proxy.conf"): nginxconf.RenderProxyConfig(),
+		i.plan.systemdUnitPath: nginxconf.RenderSystemdUnit(cfg),
+		i.plan.logrotatePath:   nginxconf.RenderLogrotate(cfg),
 	}
 	for path, content := range files {
 		if err := fileutil.EnsureDir(filepath.Dir(path), 0o755); err != nil {
@@ -411,143 +420,19 @@ func resolveLatestOpenSSLVersion() (string, error) {
 	return "", fmt.Errorf("no stable OpenSSL 3.x release found in GitHub API response")
 }
 
-func renderNginxBaseConfig(plan nginxInstallPlan) string {
-	return fmt.Sprintf(`user %s %s;
-worker_processes auto;
-
-error_log %s/error_nginx.log crit;
-pid /var/run/nginx.pid;
-worker_rlimit_nofile 51200;
-
-events {
-  use epoll;
-  worker_connections 51200;
-  multi_accept on;
-}
-
-http {
-  include mime.types;
-  default_type application/octet-stream;
-  server_names_hash_bucket_size 128;
-  client_header_buffer_size 32k;
-  large_client_header_buffers 4 32k;
-  client_max_body_size 1024m;
-  client_body_buffer_size 10m;
-  sendfile on;
-  tcp_nopush on;
-  keepalive_timeout 120;
-  server_tokens off;
-  tcp_nodelay on;
-
-  gzip on;
-  gzip_buffers 16 8k;
-  gzip_comp_level 6;
-  gzip_http_version 1.1;
-  gzip_min_length 256;
-  gzip_proxied any;
-  gzip_vary on;
-  gzip_types text/xml application/xml application/atom+xml application/rss+xml application/xhtml+xml image/svg+xml text/javascript application/javascript application/x-javascript text/x-json application/json text/css text/plain image/x-icon;
-  gzip_disable "MSIE [1-6]\.(?!.*SV1)";
-
-  log_format json escape=json '{"@timestamp":"$time_iso8601","server_addr":"$server_addr","remote_addr":"$remote_addr","scheme":"$scheme","request_method":"$request_method","request_uri":"$request_uri","request_time":$request_time,"body_bytes_sent":$body_bytes_sent,"status":"$status","host":"$host","http_referer":"$http_referer","http_user_agent":"$http_user_agent"}';
-
-  server {
-    listen 80;
-    server_name _;
-    access_log %s/access_nginx.log combined;
-    root %s/default;
-    index index.html index.htm;
-
-    location /nginx_status {
-      stub_status on;
-      access_log off;
-      allow 127.0.0.1;
-      deny all;
-    }
-
-    location ~ .*\.(gif|jpg|jpeg|png|bmp|swf|flv|mp4|ico)$ {
-      expires 30d;
-      access_log off;
-    }
-
-    location ~ .*\.(js|css)?$ {
-      expires 7d;
-      access_log off;
-    }
-
-    location ~ ^/(\.user.ini|\.ht|\.git|\.svn|\.project|LICENSE|README.md) {
-      deny all;
-    }
-
-    location /.well-known {
-      allow all;
-    }
-  }
-
-  include vhost/*.conf;
-}
-`, plan.runUser, plan.runGroup, plan.wwwLogsRoot, plan.wwwLogsRoot, plan.wwwRoot)
-}
-
-func renderNginxProxyConfig() string {
-	return `proxy_connect_timeout 300s;
-proxy_send_timeout 900;
-proxy_read_timeout 900;
-proxy_buffer_size 32k;
-proxy_buffers 4 64k;
-proxy_busy_buffers_size 128k;
-proxy_redirect off;
-proxy_hide_header Vary;
-proxy_set_header Accept-Encoding '';
-proxy_set_header Referer $http_referer;
-proxy_set_header Cookie $http_cookie;
-proxy_set_header Host $host;
-proxy_set_header X-Real-IP $remote_addr;
-proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-proxy_set_header X-Forwarded-Proto $scheme;
-`
-}
-
-func renderNginxSystemdService(plan nginxInstallPlan) string {
-	nginxBin := filepath.Join(plan.installPath, "sbin", "nginx")
-	nginxConf := filepath.Join(plan.installPath, "conf", "nginx.conf")
-	return fmt.Sprintf(`[Unit]
-Description=nginx - high performance web server
-Documentation=http://nginx.org/en/docs/
-After=network.target
-
-[Service]
-Type=forking
-PIDFile=/var/run/nginx.pid
-ExecStartPost=/bin/sleep 0.1
-ExecStartPre=%s -t -c %s
-ExecStart=%s -c %s
-ExecReload=/bin/kill -s HUP $MAINPID
-ExecStop=/bin/kill -s QUIT $MAINPID
-TimeoutStartSec=120
-LimitNOFILE=1000000
-LimitNPROC=1000000
-LimitCORE=1000000
-
-[Install]
-WantedBy=multi-user.target
-`, nginxBin, nginxConf, nginxBin, nginxConf)
-}
-
-func renderNginxLogrotateConfig(plan nginxInstallPlan) string {
-	return fmt.Sprintf(`%s/*nginx.log {
-  daily
-  rotate 5
-  missingok
-  dateext
-  compress
-  notifempty
-  sharedscripts
-  postrotate
-    [ -e /var/run/nginx.pid ] && kill -USR1 $(cat /var/run/nginx.pid)
-  endscript
-}
-`, plan.wwwLogsRoot)
+// toNginxConf converts the install plan to the shared nginxconf.Config used
+// by pkg/nginxconf renderers.
+func (p nginxInstallPlan) toNginxConf() nginxconf.Config {
+	return nginxconf.Config{
+		InstallPath:     p.installPath,
+		WWWRoot:         p.wwwRoot,
+		SSLRoot:         p.sslRoot,
+		WWWLogsRoot:     p.wwwLogsRoot,
+		RunUser:         p.runUser,
+		RunGroup:        p.runGroup,
+		SystemdUnitPath: p.systemdUnitPath,
+		LogrotatePath:   p.logrotatePath,
+	}
 }
 
 func configString(cfg *viper.Viper, key, fallback string) string {

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"OpsVault/pkg/credutil"
+	"OpsVault/pkg/redisconf"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -89,45 +89,11 @@ func (d *RedisDriver) prepareConfig(confDir string) error {
 	if _, err := os.Stat(filePath); err == nil {
 		return nil
 	}
-	content := `bind 0.0.0.0
-protected-mode no
-port 6379
-tcp-backlog 511
-timeout 0
-tcp-keepalive 300
-daemonize no
-supervised no
-loglevel notice
-databases 16
-always-show-logo yes
-save 900 1
-save 300 10
-save 60 10000
-stop-writes-on-bgsave-error yes
-rdbcompression yes
-rdbchecksum yes
-dbfilename dump.rdb
-dir /data
-appendonly yes
-appendfilename "appendonly.aof"
-appendfsync everysec
-no-appendfsync-on-rewrite no
-auto-aof-rewrite-percentage 100
-auto-aof-rewrite-min-size 64mb
-aof-load-truncated yes
-aof-use-rdb-preamble yes
-`
 	pwd := d.password
 	if pwd == "" {
 		pwd = d.Config.GetString("redis.password")
 	}
-	if pwd != "" {
-		escapedPwd := strings.ReplaceAll(pwd, "\\", "\\\\")
-		escapedPwd = strings.ReplaceAll(escapedPwd, "\"", "\\\"")
-		content += fmt.Sprintf("\nrequirepass \"%s\"\n", escapedPwd)
-	}
-
-	return os.WriteFile(filePath, []byte(content), 0o644)
+	return os.WriteFile(filePath, []byte(redisconf.RenderRedisCnf(pwd)), 0o644)
 }
 
 func (d *RedisDriver) Upgrade(targetVersion string) error {

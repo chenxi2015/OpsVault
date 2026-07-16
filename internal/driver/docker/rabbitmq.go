@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"OpsVault/pkg/credutil"
+	"OpsVault/pkg/rabbitmqconf"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -100,12 +101,7 @@ func (d *RabbitMQDriver) prepareConfig(confDir string) error {
 	if _, err := os.Stat(filePath); err == nil {
 		return nil
 	}
-	content := fmt.Sprintf(`loopback_users.guest = false
-listeners.tcp.default = 5672
-default_user = %s
-default_pass = %s
-`, d.user, d.pass)
-	return os.WriteFile(filePath, []byte(content), 0o644)
+	return os.WriteFile(filePath, []byte(rabbitmqconf.RenderRabbitMQConf(d.user, d.pass)), 0o644)
 }
 
 func (d *RabbitMQDriver) Upgrade(targetVersion string) error {

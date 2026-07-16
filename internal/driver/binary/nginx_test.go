@@ -64,43 +64,6 @@ func TestNginxInstallPlanMatchesVendoredScriptFlow(t *testing.T) {
 	}
 }
 
-func TestRenderNginxBaseConfigUsesConfiguredPaths(t *testing.T) {
-	cfg := testNginxConfig(t)
-	plan := newNginxInstallPlan(cfg)
-
-	conf := renderNginxBaseConfig(plan)
-
-	for _, want := range []string{
-		"user www www;",
-		"error_log " + cfg.GetString("nginx.wwwlogs_root") + "/error_nginx.log crit;",
-		"access_log " + cfg.GetString("nginx.wwwlogs_root") + "/access_nginx.log combined;",
-		"root " + cfg.GetString("nginx.www_root") + "/default;",
-		"include vhost/*.conf;",
-	} {
-		if !strings.Contains(conf, want) {
-			t.Fatalf("nginx.conf missing %q:\n%s", want, conf)
-		}
-	}
-}
-
-func TestRenderNginxSystemdServiceUsesConfiguredInstallPath(t *testing.T) {
-	cfg := testNginxConfig(t)
-	plan := newNginxInstallPlan(cfg)
-
-	unit := renderNginxSystemdService(plan)
-
-	for _, want := range []string{
-		"PIDFile=/var/run/nginx.pid",
-		"ExecStartPre=" + cfg.GetString("nginx.install_path") + "/sbin/nginx -t -c " + cfg.GetString("nginx.install_path") + "/conf/nginx.conf",
-		"ExecStart=" + cfg.GetString("nginx.install_path") + "/sbin/nginx -c " + cfg.GetString("nginx.install_path") + "/conf/nginx.conf",
-		"ExecReload=/bin/kill -s HUP $MAINPID",
-	} {
-		if !strings.Contains(unit, want) {
-			t.Fatalf("systemd unit missing %q:\n%s", want, unit)
-		}
-	}
-}
-
 func TestAddVHostCreatesRootAndConfig(t *testing.T) {
 	cfg := testNginxConfig(t)
 	drv := NewNginxDriver(cfg)

@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"OpsVault/pkg/credutil"
+	"OpsVault/pkg/mysqlconf"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/spf13/viper"
 )
-
 
 type MySQLDriver struct {
 	*BaseDriver
@@ -79,16 +79,7 @@ func (d *MySQLDriver) prepareConfig(confDir string) error {
 	if _, err := os.Stat(filePath); err == nil {
 		return nil
 	}
-	content := `[mysqld]
-user=mysql
-default-storage-engine=InnoDB
-character-set-server=utf8mb4
-collation-server=utf8mb4_unicode_ci
-
-[client]
-default-character-set=utf8mb4
-`
-	return os.WriteFile(filePath, []byte(content), 0o644)
+	return os.WriteFile(filePath, []byte(mysqlconf.RenderMyCnf()), 0o644)
 }
 
 func (d *MySQLDriver) Upgrade(targetVersion string) error {
@@ -106,4 +97,3 @@ func (d *MySQLDriver) GetCredentials() []credutil.Credential {
 		{Label: "密  码", Value: d.rootPassword},
 	}
 }
-
