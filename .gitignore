@@ -8,5 +8,6 @@ bin/*
 .agent
 *ansible.yaml
 configs/ansible.*.yaml
+configs/default.yaml
 !configs/ansible.example.yaml
 ansible_tmp/
