@@ -67,6 +67,7 @@ func NewCommand(cfg *viper.Viper) *cobra.Command {
 	cmd.PersistentFlags().StringP("env", "e", "", "ansible environment configuration (e.g. dev, test, prod)")
 
 	cmd.AddCommand(
+		c.newListCommand(),
 		c.newPingCommand(),
 		c.newExecCommand(),
 		c.newDoctorCommand(),
