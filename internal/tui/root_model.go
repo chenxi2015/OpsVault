@@ -450,7 +450,11 @@ func (m *RootModel) handleInputSubmit() (tea.Model, tea.Cmd) {
 		}
 		m.textInputState = "vhost_root|" + val
 		m.textInputPrompt = fmt.Sprintf("Enter Virtual Host Root Directory (Domain: %s):", val)
-		m.textInputValue = "/data/wwwroot/" + val
+		wwwRoot := m.config.GetString("nginx.www_root")
+		if wwwRoot == "" {
+			wwwRoot = "/data/wwwroot"
+		}
+		m.textInputValue = filepath.Join(wwwRoot, val)
 		m.editing = true
 		return m, nil
 
@@ -459,7 +463,11 @@ func (m *RootModel) handleInputSubmit() (tea.Model, tea.Cmd) {
 			domain := strings.TrimPrefix(m.textInputState, "vhost_root|")
 			root := val
 			if root == "" {
-				root = "/data/wwwroot/" + domain
+				wwwRoot := m.config.GetString("nginx.www_root")
+				if wwwRoot == "" {
+					wwwRoot = "/data/wwwroot"
+				}
+				root = filepath.Join(wwwRoot, domain)
 			}
 			svc := m.findRegistry("nginx")
 			if svc == nil {

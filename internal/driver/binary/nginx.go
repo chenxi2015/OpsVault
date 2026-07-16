@@ -166,8 +166,11 @@ func (d *NginxDriver) reloadNginxSafe() error {
 
 
 func (d *NginxDriver) AddVHost(domain, root string) error {
-	if domain == "" || root == "" {
-		return fmt.Errorf("domain and root are required")
+	if domain == "" {
+		return fmt.Errorf("domain is required")
+	}
+	if root == "" {
+		root = filepath.Join(nginxConfigString(d.Config, "nginx.www_root"), domain)
 	}
 	if err := fileutil.EnsureDir(root, 0o755); err != nil {
 		return err
@@ -188,11 +191,22 @@ func (d *NginxDriver) DeleteVHost(domain string, deleteRoot bool) error {
 		return fmt.Errorf("domain is required")
 	}
 	confPath := filepath.Join(d.getVHostDir(), domain+".conf")
+
+	var root string
+	if deleteRoot {
+		if data, err := os.ReadFile(confPath); err == nil {
+			root = extractRootPath(string(data))
+		}
+		if root == "" {
+			root = filepath.Join(nginxConfigString(d.Config, "nginx.www_root"), domain)
+		}
+	}
+
 	if err := os.Remove(confPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if deleteRoot {
-		root := filepath.Join(nginxConfigString(d.Config, "nginx.www_root"), domain)
+
+	if deleteRoot && root != "" {
 		if err := fileutil.RemoveIfExists(root); err != nil {
 			return err
 		}
@@ -314,7 +328,16 @@ func (d *NginxDriver) ApplySSL(domain string) error {
 	if !d.isLinuxOrTest() {
 		return fmt.Errorf("applying SSL certificates is only supported on Linux")
 	}
-	root := filepath.Join(nginxConfigString(d.Config, "nginx.www_root"), domain)
+
+	var root string
+	confPath := d.vhostConfPath(domain)
+	if data, err := os.ReadFile(confPath); err == nil {
+		root = extractRootPath(string(data))
+	}
+	if root == "" {
+		root = filepath.Join(nginxConfigString(d.Config, "nginx.www_root"), domain)
+	}
+
 	manager := sslutil.Manager{SSLRoot: nginxConfigString(d.Config, "nginx.ssl_root")}
 	if err := manager.Apply(domain, root); err != nil {
 		return err

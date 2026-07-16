@@ -1,6 +1,10 @@
 package nginx
 
-import "github.com/spf13/cobra"
+import (
+	"path/filepath"
+
+	"github.com/spf13/cobra"
+)
 
 func (c *commandSet) newVHostCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -18,13 +22,19 @@ func (c *commandSet) newVHostAddCommand() *cobra.Command {
 		Use:   "add",
 		Short: "Add a virtual host",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if root == "" {
+				wwwRoot := c.config.GetString("nginx.www_root")
+				if wwwRoot == "" {
+					wwwRoot = "/data/wwwroot"
+				}
+				root = filepath.Join(wwwRoot, domain)
+			}
 			return c.driver().AddVHost(domain, root)
 		},
 	}
 	cmd.Flags().StringVar(&domain, "domain", "", "vhost domain")
-	cmd.Flags().StringVar(&root, "root", "", "website root path")
+	cmd.Flags().StringVar(&root, "root", "", "website root path (defaults to {nginx.www_root}/{domain} from config)")
 	_ = cmd.MarkFlagRequired("domain")
-	_ = cmd.MarkFlagRequired("root")
 	return cmd
 }
 

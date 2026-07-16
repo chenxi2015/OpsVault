@@ -101,6 +101,74 @@ func TestAddVHostCreatesRootAndConfig(t *testing.T) {
 	}
 }
 
+func TestAddVHostDefaultsRoot(t *testing.T) {
+	cfg := testNginxConfig(t)
+	drv := NewNginxDriver(cfg)
+	reloads := 0
+	oldReload := reloadNginx
+	reloadNginx = func() error {
+		reloads++
+		return nil
+	}
+	defer func() {
+		reloadNginx = oldReload
+	}()
+
+	if err := drv.AddVHost("defaulted.com", ""); err != nil {
+		t.Fatalf("AddVHost: %v", err)
+	}
+
+	expectedRoot := filepath.Join(cfg.GetString("nginx.www_root"), "defaulted.com")
+	confPath := filepath.Join(cfg.GetString("nginx.install_path"), "conf", "vhost", "defaulted.com.conf")
+	data, err := os.ReadFile(confPath)
+	if err != nil {
+		t.Fatalf("read conf: %v", err)
+	}
+	if !strings.Contains(string(data), "root "+expectedRoot+";") {
+		t.Fatalf("conf missing root: %s", string(data))
+	}
+	if _, err := os.Stat(expectedRoot); err != nil {
+		t.Fatalf("stat root: %v", err)
+	}
+	if reloads != 1 {
+		t.Fatalf("reloads after add = %d, want 1", reloads)
+	}
+}
+
+func TestDeleteVHostWithCustomRoot(t *testing.T) {
+	cfg := testNginxConfig(t)
+	drv := NewNginxDriver(cfg)
+	customRoot := filepath.Join(t.TempDir(), "custom-root")
+	reloads := 0
+	oldReload := reloadNginx
+	reloadNginx = func() error {
+		reloads++
+		return nil
+	}
+	defer func() {
+		reloadNginx = oldReload
+	}()
+
+	if err := drv.AddVHost("custom.com", customRoot); err != nil {
+		t.Fatalf("AddVHost: %v", err)
+	}
+
+	if _, err := os.Stat(customRoot); err != nil {
+		t.Fatalf("customRoot not created: %v", err)
+	}
+
+	if err := drv.DeleteVHost("custom.com", true); err != nil {
+		t.Fatalf("DeleteVHost: %v", err)
+	}
+
+	if _, err := os.Stat(customRoot); err == nil {
+		t.Fatalf("customRoot was not deleted")
+	}
+	if reloads != 2 {
+		t.Fatalf("reloads after add+del = %d, want 2", reloads)
+	}
+}
+
 func TestReloadUsesReloadHook(t *testing.T) {
 	cfg := testNginxConfig(t)
 	drv := NewNginxDriver(cfg)
