@@ -163,10 +163,11 @@ func TestMySQLUpgradeRecreatesContainerWithNewTag(t *testing.T) {
 	if createImage != "mysql:8.4" {
 		t.Fatalf("create image = %q, want %q", createImage, "mysql:8.4")
 	}
-	if len(requests) != 10 {
+	if len(requests) != 11 {
 		t.Fatalf("requests = %#v", requests)
 	}
 	wantRequests := []string{
+		"GET /v1.47/networks",
 		"GET /v1.47/networks",
 		"POST /v1.47/networks/create",
 		"POST /v1.47/images/create",
@@ -181,11 +182,11 @@ func TestMySQLUpgradeRecreatesContainerWithNewTag(t *testing.T) {
 			t.Fatalf("requests[%d] = %q, want %q; all requests=%#v", i, requests[i], wantRequests[i], requests)
 		}
 	}
-	if !strings.Contains(requests[8], "/containers/opsvault-mysql/json") {
-		t.Fatalf("requests[8] = %q, want health inspect", requests[8])
+	if !strings.Contains(requests[9], "/containers/opsvault-mysql/json") {
+		t.Fatalf("requests[9] = %q, want health inspect", requests[9])
 	}
-	if !strings.Contains(requests[9], "/containers/opsvault-mysql-backup-") {
-		t.Fatalf("requests[9] = %q, want backup cleanup", requests[9])
+	if !strings.Contains(requests[10], "/containers/opsvault-mysql-backup-") {
+		t.Fatalf("requests[10] = %q, want backup cleanup", requests[10])
 	}
 }
 
@@ -320,6 +321,7 @@ func TestMySQLInstallPullsImageStartsContainerAndWaitsHealthy(t *testing.T) {
 		t.Fatalf("bind value = %q", bindValue)
 	}
 	wantRequests := []string{
+		"GET /v1.47/networks",
 		"GET /v1.47/networks",
 		"POST /v1.47/networks/create",
 		"POST /v1.47/images/create",

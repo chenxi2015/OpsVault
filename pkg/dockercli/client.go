@@ -2,6 +2,9 @@ package dockercli
 
 import (
 	"context"
+	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
@@ -39,15 +42,51 @@ func ResolveContainerName(cfg *viper.Viper, name string) string {
 	return prefix + "-" + name
 }
 
-
 func New() (*client.Client, error) {
 	return client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+}
+
+func CleanOrphanedBridges(ctx context.Context, cli *client.Client) error {
+	if cli == nil {
+		return nil
+	}
+	networks, err := cli.NetworkList(ctx, network.ListOptions{})
+	if err != nil {
+		return err
+	}
+	activeIds := make(map[string]bool)
+	for _, nw := range networks {
+		if len(nw.ID) >= 12 {
+			activeIds[nw.ID[:12]] = true
+		} else {
+			activeIds[nw.ID] = true
+		}
+	}
+
+	files, err := os.ReadDir("/sys/class/net")
+	if err != nil {
+		return nil
+	}
+
+	for _, f := range files {
+		name := f.Name()
+		if strings.HasPrefix(name, "br-") {
+			idPart := strings.TrimPrefix(name, "br-")
+			if len(idPart) == 12 {
+				if !activeIds[idPart] {
+					_ = exec.CommandContext(ctx, "ip", "link", "delete", name).Run()
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func EnsureNetwork(ctx context.Context, cli *client.Client, name, cidr string) error {
 	if cli == nil {
 		return nil
 	}
+	_ = CleanOrphanedBridges(ctx, cli)
 	existing, err := cli.NetworkList(ctx, network.ListOptions{})
 	if err != nil {
 		return err

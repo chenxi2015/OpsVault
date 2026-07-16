@@ -16,6 +16,7 @@ func (c *commandSet) newPushCommand() *cobra.Command {
 	var group string
 	var binPath string
 	var cfgPath string
+	var force bool
 
 	cmd := &cobra.Command{
 		Use:   "push",
@@ -81,6 +82,7 @@ func (c *commandSet) newPushCommand() *cobra.Command {
 				DataRoot:    dataRoot,
 				BinaryPath:  binPath,
 				ConfigPath:  cfgPath,
+				Force:       force,
 			}
 
 			fmt.Printf("Generating push playbook for group: %s...\n", group)
@@ -106,6 +108,7 @@ func (c *commandSet) newPushCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&group, "group", "g", "all", "target host group for push")
 	cmd.Flags().StringVar(&binPath, "bin", "./bin/opsvault-linux-amd64", "local path to OpsVault executable binary")
 	cmd.Flags().StringVar(&cfgPath, "config-path", "./configs/default.yaml", "local path to configuration file to push")
+	cmd.Flags().BoolVar(&force, "force", false, "force overwrite remote configuration file")
 
 	return cmd
 }

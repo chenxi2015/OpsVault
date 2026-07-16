@@ -655,4 +655,8 @@ func (d *BaseDriver) applyResources(hostCfg *container.HostConfig) {
 	if mem > 0 {
 		hostCfg.Resources.Memory = mem
 	}
+	// Configure restart policy for container self-recovery (e.g. server reboot)
+	hostCfg.RestartPolicy = container.RestartPolicy{
+		Name: container.RestartPolicyAlways,
+	}
 }
