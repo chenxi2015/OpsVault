@@ -68,7 +68,7 @@ func TestGeneratePlaybookFile(t *testing.T) {
 				if !strings.Contains(content, "opsvault-mysql") {
 					t.Errorf("expected mysql container name prefix to be rendered")
 				}
-				if !strings.Contains(content, "MYSQL_ROOT_PASSWORD=rootpassword") {
+				if !strings.Contains(content, "MYSQL_ROOT_PASSWORD='rootpassword'") {
 					t.Errorf("expected mysql root password to be rendered")
 				}
 			} else if svc == "nginx" {

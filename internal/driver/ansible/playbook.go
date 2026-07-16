@@ -27,24 +27,53 @@ var PlaybookTemplates = map[string]string{
       register: docker_check
       ignore_errors: yes
 
-    - name: Install dependencies for Docker
-      yum:
-        name:
-          - yum-utils
-          - device-mapper-persistent-data
-          - lvm2
-        state: present
+    - name: Set default Docker Repo Version
+      set_fact:
+        docker_repo_ver: "{{ "{{" }} ansible_distribution_major_version {{ "}}" }}"
       when: docker_check.rc != 0
 
+    - name: Ensure fallback Docker Repo Version is 7
+      set_fact:
+        docker_repo_ver: "7"
+      when:
+        - docker_check.rc != 0
+        - docker_repo_ver not in ['7', '8', '9']
+
+    - name: Override Docker Repo Version for TencentOS 3
+      set_fact:
+        docker_repo_ver: "8"
+      when:
+        - docker_check.rc != 0
+        - ansible_distribution | lower == 'tencentos'
+        - ansible_distribution_major_version | int == 3
+
+    - name: Override Docker Repo Version for TencentOS 4
+      set_fact:
+        docker_repo_ver: "9"
+      when:
+        - docker_check.rc != 0
+        - ansible_distribution | lower == 'tencentos'
+        - ansible_distribution_major_version | int == 4
+
     - name: Add Docker CE repository
-      get_url:
-        url: https://mirrors.cloud.tencent.com/docker-ce/linux/centos/docker-ce.repo
+      copy:
         dest: /etc/yum.repos.d/docker-ce.repo
+        content: |
+          [docker-ce-stable]
+          name=Docker CE Stable
+          baseurl=https://mirrors.cloud.tencent.com/docker-ce/linux/centos/{{ "{{" }} docker_repo_ver {{ "}}" }}/$basearch/stable
+          enabled=1
+          gpgcheck=1
+          gpgkey=https://mirrors.cloud.tencent.com/docker-ce/linux/centos/gpg
+        mode: '0644'
       when: docker_check.rc != 0
 
     - name: Install Docker CE
       yum:
-        name: docker-ce
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
         state: present
       when: docker_check.rc != 0
 
@@ -151,7 +180,7 @@ var PlaybookTemplates = map[string]string{
         -p {{ .MySQLPort }}:3306
         -v {{ .DataRoot }}/mysql/data:/var/lib/mysql
         -v {{ .DataRoot }}/mysql/conf/my.cnf:/etc/mysql/conf.d/my.cnf
-        -e MYSQL_ROOT_PASSWORD={{ .MySQLRootPassword }}
+        -e MYSQL_ROOT_PASSWORD='{{ .MySQLRootPassword }}'
         {{ .MySQLImage }}
 `,
 
@@ -294,8 +323,8 @@ var PlaybookTemplates = map[string]string{
         -p {{ .RabbitMQUIPort }}:15672
         -v {{ .DataRoot }}/rabbitmq/data:/var/lib/rabbitmq
         -v {{ .DataRoot }}/rabbitmq/conf/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
-        -e RABBITMQ_DEFAULT_USER={{ .RabbitMQUser }}
-        -e RABBITMQ_DEFAULT_PASS={{ .RabbitMQPwd }}
+        -e RABBITMQ_DEFAULT_USER='{{ .RabbitMQUser }}'
+        -e RABBITMQ_DEFAULT_PASS='{{ .RabbitMQPwd }}'
         {{ .RabbitMQImage }}
 `,
 

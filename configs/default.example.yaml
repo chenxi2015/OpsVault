@@ -1,9 +1,9 @@
 backup:
-  storage_path: /www/opsvault/bak  # 配置文件备份存储路径
+  storage_path: /data/opsvault/bak  # 配置文件备份存储路径
 docker:
   bind_ip: 0.0.0.0  # 容器端口在宿主机上绑定的IP地址
   cidr: 172.28.0.0/16  # 专用桥接网络的 CIDR 网段
-  data_root: /www/opsvault  # 宿主机数据挂载的根目录
+  data_root: /data/opsvault  # 宿主机数据挂载的根目录
   name_prefix: opsvault  # 容器与网络名称的统一前缀
   network_name: opsvault-net  # Docker 网络桥接网卡名称
   registry_mirrors:  # Docker 镜像源加速源列表（部署或初始化时自动注入 /etc/docker/daemon.json）
@@ -15,7 +15,7 @@ docker:
     mem_max: 2g  # 每个容器分配的最大内存限制
 log:
   level: info  # 日志级别 (debug, info, warn, error)
-  storage_path: /www/opsvault/logs  # 应用程序日志存储路径
+  storage_path: /data/opsvault/logs  # 应用程序日志存储路径
 mode: docker  # 默认部署模式 (docker 或 binary)
 mysql:
   image: mysql:8.0  # MySQL Docker 镜像标签
@@ -26,15 +26,15 @@ nginx:
   logrotate_path: /etc/logrotate.d/nginx  # Nginx 日志轮转配置文件路径
   openssl_version: latest   # 编译 Nginx 时使用的 OpenSSL 版本，latest=安装时自动获取最新稳定版
   pcre_version: "8.45"  # 编译 Nginx 时使用的 PCRE 版本
-  run_group: www  # Nginx 运行时的用户组
-  run_user: www  # Nginx 运行时的用户名
+  run_group: data  # Nginx 运行时的用户组
+  run_user: data  # Nginx 运行时的用户名
   source_root: /usr/local/src/opsvault-nginx  # Nginx 源码下载与编译路径
-  ssl_root: /www/opsvault/ssl  # SSL 证书存储目录
+  ssl_root: /data/opsvault/ssl  # SSL 证书存储目录
   systemd_unit_path: /lib/systemd/system/nginx.service  # Nginx systemd 服务文件路径
   version: latest  # 准备编译的 Nginx 版本，latest=安装时自动从 nginx.org 获取最新稳定版
   vhost_dir: ""  # 虚拟主机配置文件目录（留空则默认为 {install_path}/conf/vhost） 需要配置全路径地址 如：/usr/local/nginx/conf/vhost 
-  www_root: /www/opsvault/wwwroot  # 网站根目录
-  wwwlogs_root: /www/opsvault/wwwlogs  # Nginx 访问与错误日志目录
+  data_root: /data/opsvault/dataroot  # 网站根目录
+  datalogs_root: /data/opsvault/datalogs  # Nginx 访问与错误日志目录
 postgres:
   image: postgres:15  # PostgreSQL Docker 镜像标签
   password: ""  # PostgreSQL 密码（留空则自动生成随机密码）
