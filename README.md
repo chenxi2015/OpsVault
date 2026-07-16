@@ -29,6 +29,7 @@ OpsVault 是一个面向 CentOS 7 / CentOS Stream 的运维工具箱，提供：
   - `opsvault rabbitmq ...`
   - `opsvault postgres ...`
   - `opsvault bak ...` (配置备份与恢复)
+  - `opsvault ansible ...` (多机批量连接、巡检、自动化部署、二进制分发与服务回收)
 - 全局配置加载与默认配置模板
 - `driver.ServiceDriver` 统一接口与 `ServiceStatus` 状态结构
 - Docker 网络/基础驱动封装
@@ -197,16 +198,39 @@ Ansible 命令组支持多环境配置，通过 `-e` 或 `--env` 参数指定环
     # 在受控机器上并发执行 ad-hoc 命令
     opsvault ansible exec --cmd "uptime" --group my_servers
     ```
+*   **查看主机与分组清单 (List)**：
+    快速查看当前 Ansible 配置文件（如 `ansible.yaml` 或 `-e prod` 对应环境）中已配置的所有服务器分组列表、目标主机及连接认证方式：
+    ```bash
+    opsvault ansible list
+    ```
 *   **多机环境巡检 (Doctor)**：
     获取远程节点的负载、内存、磁盘以及 Docker/Nginx 服务运行状态，并在终端渲染出 Lipgloss 漂亮的统计表格：
     ```bash
     opsvault ansible doctor --group my_servers
     ```
 *   **批量一键部署中间件 (Deploy)**：
-    通过 Ansible Playbook 批量向远程机器部署指定中间件（支持 docker、mysql、redis、rabbitmq）：
+    通过 Ansible Playbook 批量向远程机器部署指定中间件（支持 docker、mysql、redis、rabbitmq、nginx）：
     ```bash
     # 远程批量拉取并部署 Redis 容器，包含专属网桥与持久化挂载
     opsvault ansible deploy --service redis --group my_servers
+    ```
+    > [!NOTE]
+    > 当部署 `mysql`、`redis`、`rabbitmq` 时如果密码为空，系统会自动通过 `credutil.GenPassword(20)` 生成 20 位高强度密码下发至集群，并在终端通过 Lipgloss 彩色边框卡片清晰输出部署成功凭据。
+*   **二进制与配置一键下发 (Push)**：
+    将控制端本地编译好的 Linux 二进制文件（如 `opsvault-linux-amd64`）和 `default.yaml` 配置文件推送至被控集群主机的 `/data/opsvault/bin` 和 `/configs` 中，并自动在目标服务器创建 `/usr/local/bin/opsvault` 软链接。
+    ```bash
+    # 下发可执行文件与配置文件到被控端
+    opsvault ansible push --group my_servers --bin ./bin/opsvault-linux-amd64 --config-path ./configs/default.yaml
+    ```
+    **✨ 边缘协同亮点**：下发成功后，登录任意目标节点 SSH，敲下 `opsvault tui` 或 `opsvault status` 即可就地使用可视化运维终端，实现“中心批量自动化，边缘单机深度排查”！
+*   **批量优雅回收与清理 (Uninstall)**：
+    对远程集群批量卸载指定组件或 Docker Engine。携带 `--purge` 标志时会彻底物理擦除挂载数据卷与站点日志目录：
+    ```bash
+    # 仅卸载服务容器/进程（安全保留数据卷）
+    opsvault ansible uninstall --service mysql --group my_servers
+
+    # 深度物理回收（连同宿主机 /data/opsvault/rabbitmq 挂载目录彻底清空）
+    opsvault ansible uninstall --service rabbitmq --group my_servers --purge
     ```
 
 ## TUI 运维工作台说明

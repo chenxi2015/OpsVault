@@ -85,10 +85,22 @@ OpsVault/
 │   ├── redis/              # Docker部署Redis
 │   ├── rocketmq/           # Docker部署RocketMQ
 │   ├── rabbitmq/           # Docker部署RabbitMQ
-│   └── postgres/           # 预留PostgreSQL（Docker驱动）
+│   ├── postgres/           # 预留PostgreSQL（Docker驱动）
+│   └── ansible/            # Ansible多机编排、下发分发与回收
+│       ├── root.go         # 根入口与多环境加载 (-e test|prod)
+│       ├── ping.go         # 批量连通性测试
+│       ├── exec.go         # ad-hoc shell并发执行
+│       ├── doctor.go       # 多机负载/系统与中间件体检
+│       ├── list.go         # 主机分组与资产清单概览
+│       ├── deploy.go       # 批量一键中间件编排部署 (生成强密码并持久化)
+│       ├── push.go         # 边缘推流：下发二进制和配置文件至被控端
+│       └── uninstall.go    # 远程集群批量回收与深度清理 (--purge)
 ├── internal/               # 核心业务逻辑、驱动抽象
 │   ├── driver/
 │   │   ├── driver.go       # ServiceDriver统一接口定义
+│   │   ├── ansible/        # Ansible驱动编排包
+│   │   │   ├── executor.go # Ansible Executor封装与并发调起
+│   │   │   └── playbook.go # PlaybookTemplates、UninstallTemplates及动态Inventory渲染
 │   │   ├── docker/         # Docker驱动实现包
 │   │   │   ├── network.go  # opsvault-net网桥创建/校验工具
 │   │   │   ├── base.go
@@ -215,6 +227,22 @@ opsvault postgres uninstall
 opsvault postgres upgrade
 ```
 
+## 3.8 Ansible 批量集群编排与边缘协作 (`cmd/ansible`)
+```bash
+# 基础连接、连通性与执行
+opsvault ansible ping --group db_servers [-e test|prod]
+opsvault ansible exec --cmd "uptime" --group db_servers [-e test|prod]
+opsvault ansible doctor --group db_servers [-e test|prod]
+opsvault ansible list [-e test|prod]
+
+# 批量一键中介件编排部署与回收
+opsvault ansible deploy --service mysql --group db_servers
+opsvault ansible uninstall --service mysql --group db_servers [--purge]
+
+# 边缘推流初始化 (推送可执行文件与配置至 /data/opsvault/ 并创建全局软连)
+opsvault ansible push --group db_servers --bin ./bin/opsvault-linux-amd64 --config-path ./configs/default.yaml
+```
+
 ---
 
 # 4 各组件功能完整需求
@@ -266,6 +294,13 @@ opsvault postgres upgrade
 
 ## 4.6 PostgreSQL（预留迭代）
 *   逻辑完全对齐 MySQL Docker 驱动，端口 5432，独立宿主机数据目录，后续可扩展 BinaryDriver 二进制安装。
+
+## 4.7 Ansible 批量驱动与边缘协同模块 (`internal/driver/ansible`)
+*   **多机连通性与执行**：支持并发 SSH Ping 与 ad-hoc 执行，自动从 CLI 提取当前激活的 Cobra 参数并与 Viper 配置合并。
+*   **多机健康诊断 (doctor)**：获取并解析集群多主机 CPU、内存、根分区磁盘及 `docker`/`nginx` 服务运行状态，通过 `lipgloss` 渲染终端表格。
+*   **安全凭据生成与下发**：当 `ansible deploy` 部署 MySQL / Redis / RabbitMQ 时若未设定凭据，系统由 `credutil.GenPassword(20)` 自动生成 20 位高强度强密码，嵌入 Playbook 批量渲染下发，并在终端展示高亮卡片。
+*   **边缘协同推送 (push)**：推送到目标节点 `/data/opsvault/bin` 和 `/configs` 中并生成 `/usr/local/bin/opsvault` 全局链接，赋予每个节点本地就地运行 `opsvault tui` 的独立运维能力。
+*   **批量远程优雅回收 (uninstall)**：根据 `serviceName` 批量调用 Docker/systemd 停止并卸载组件，配合 `--purge` 开关控制 `/data/opsvault/` 挂载目录物理卸载。
 
 ---
 
@@ -325,7 +360,7 @@ log:
 *   **二期开发**：PostgreSQL Docker 完整功能
 *   **三期扩展**：为 MySQL/Redis/RocketMQ 新增 BinaryDriver 二进制部署模式
 *   **四期扩展**：集成 LLM AI 对话 TUI 子命令，自动分析中间件报错、死信堆积故障
-*   **五期扩展**：支持多服务器 SSH 批量巡检、批量部署中间件
+*   **五期完成**：多服务器 Ansible 批量集群巡检 (doctor/list/ping/exec)、中间件批量一键部署 (deploy)、边缘节点推流初始化 (push) 与服务清理回收 (uninstall)
 
 ---
 
