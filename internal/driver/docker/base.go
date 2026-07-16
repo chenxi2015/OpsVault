@@ -121,10 +121,59 @@ func (d *BaseDriver) checkAndInstallDocker() error {
 	return nil
 }
 
+func (d *BaseDriver) ensureRegistryMirrors() error {
+	if flag.Lookup("test.v") != nil || !sysutil.IsLinux() || !sysutil.IsRoot() || d.Config == nil {
+		return nil
+	}
+	mirrors := d.Config.GetStringSlice("docker.registry_mirrors")
+	if len(mirrors) == 0 {
+		mirrors = []string{
+			"https://mirror.ccs.tencentyun.com",
+			"https://docker.1panel.live",
+			"https://docker.m.daocloud.io",
+		}
+	}
+
+	daemonConfPath := "/etc/docker/daemon.json"
+	var existingMap map[string]interface{}
+	if data, err := os.ReadFile(daemonConfPath); err == nil {
+		if err := json.Unmarshal(data, &existingMap); err == nil {
+			if existingMirrors, ok := existingMap["registry-mirrors"].([]interface{}); ok {
+				var existingList []string
+				for _, em := range existingMirrors {
+					if str, ok := em.(string); ok {
+						existingList = append(existingList, str)
+					}
+				}
+				if strings.Join(existingList, ",") == strings.Join(mirrors, ",") {
+					return nil
+				}
+			}
+		}
+	} else {
+		existingMap = make(map[string]interface{})
+	}
+
+	if err := fileutil.EnsureDir("/etc/docker", 0o755); err != nil {
+		return err
+	}
+	existingMap["registry-mirrors"] = mirrors
+	outData, err := json.MarshalIndent(existingMap, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(daemonConfPath, outData, 0o644); err != nil {
+		return err
+	}
+	logger.Infof("Updated %s with registry-mirrors, restarting docker...", daemonConfPath)
+	return exec.Command("systemctl", "restart", "docker").Run()
+}
+
 func (d *BaseDriver) EnsureReady(ctx context.Context) error {
 	if err := d.checkAndInstallDocker(); err != nil {
 		return err
 	}
+	_ = d.ensureRegistryMirrors()
 	if err := fileutil.EnsureDir(d.DataDir, 0o755); err != nil {
 		return err
 	}

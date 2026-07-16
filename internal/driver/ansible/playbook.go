@@ -38,7 +38,7 @@ var PlaybookTemplates = map[string]string{
 
     - name: Add Docker CE repository
       get_url:
-        url: https://download.docker.com/linux/centos/docker-ce.repo
+        url: https://mirrors.cloud.tencent.com/docker-ce/linux/centos/docker-ce.repo
         dest: /etc/yum.repos.d/docker-ce.repo
       when: docker_check.rc != 0
 
@@ -47,6 +47,35 @@ var PlaybookTemplates = map[string]string{
         name: docker-ce
         state: present
       when: docker_check.rc != 0
+
+{{- if .RegistryMirrors }}
+    - name: Ensure /etc/docker directory exists
+      file:
+        path: /etc/docker
+        state: directory
+        mode: '0755'
+
+    - name: Configure Docker registry mirrors
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "registry-mirrors": [
+              {{- range $i, $m := .RegistryMirrors }}
+              {{- if $i }},{{ end }}
+              "{{ $m }}"
+              {{- end }}
+            ]
+          }
+      register: docker_mirror_config
+
+    - name: Restart Docker if daemon.json changed
+      systemd:
+        name: docker
+        state: restarted
+        daemon_reload: yes
+      when: docker_mirror_config.changed
+{{- end }}
 
     - name: Start and enable Docker service
       systemd:
@@ -75,6 +104,35 @@ var PlaybookTemplates = map[string]string{
         content: |
           {{ .MySQLMyCnf | indent 10 }}
         mode: '0644'
+
+{{- if .RegistryMirrors }}
+    - name: Ensure /etc/docker directory exists
+      file:
+        path: /etc/docker
+        state: directory
+        mode: '0755'
+
+    - name: Configure Docker registry mirrors
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "registry-mirrors": [
+              {{- range $i, $m := .RegistryMirrors }}
+              {{- if $i }},{{ end }}
+              "{{ $m }}"
+              {{- end }}
+            ]
+          }
+      register: docker_mirror_config
+
+    - name: Restart Docker if daemon.json changed
+      systemd:
+        name: docker
+        state: restarted
+        daemon_reload: yes
+      when: docker_mirror_config.changed
+{{- end }}
 
     - name: Create Docker bridge network if not exists
       shell: "docker network inspect {{ .NetworkName }} || docker network create --subnet={{ .CIDR }} {{ .NetworkName }}"
@@ -118,6 +176,35 @@ var PlaybookTemplates = map[string]string{
           {{ .RedisCnf | indent 10 }}
         mode: '0644'
 
+{{- if .RegistryMirrors }}
+    - name: Ensure /etc/docker directory exists
+      file:
+        path: /etc/docker
+        state: directory
+        mode: '0755'
+
+    - name: Configure Docker registry mirrors
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "registry-mirrors": [
+              {{- range $i, $m := .RegistryMirrors }}
+              {{- if $i }},{{ end }}
+              "{{ $m }}"
+              {{- end }}
+            ]
+          }
+      register: docker_mirror_config
+
+    - name: Restart Docker if daemon.json changed
+      systemd:
+        name: docker
+        state: restarted
+        daemon_reload: yes
+      when: docker_mirror_config.changed
+{{- end }}
+
     - name: Create Docker bridge network if not exists
       shell: "docker network inspect {{ .NetworkName }} || docker network create --subnet={{ .CIDR }} {{ .NetworkName }}"
       register: network_create
@@ -159,6 +246,35 @@ var PlaybookTemplates = map[string]string{
         content: |
           {{ .RabbitMQConf | indent 10 }}
         mode: '0644'
+
+{{- if .RegistryMirrors }}
+    - name: Ensure /etc/docker directory exists
+      file:
+        path: /etc/docker
+        state: directory
+        mode: '0755'
+
+    - name: Configure Docker registry mirrors
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "registry-mirrors": [
+              {{- range $i, $m := .RegistryMirrors }}
+              {{- if $i }},{{ end }}
+              "{{ $m }}"
+              {{- end }}
+            ]
+          }
+      register: docker_mirror_config
+
+    - name: Restart Docker if daemon.json changed
+      systemd:
+        name: docker
+        state: restarted
+        daemon_reload: yes
+      when: docker_mirror_config.changed
+{{- end }}
 
     - name: Create Docker bridge network if not exists
       shell: "docker network inspect {{ .NetworkName }} || docker network create --subnet={{ .CIDR }} {{ .NetworkName }}"
@@ -402,6 +518,7 @@ type PlaybookVars struct {
 	NetworkName       string
 	CIDR              string
 	NamePrefix        string
+	RegistryMirrors   []string
 	MySQLImage        string
 	MySQLPort         int
 	MySQLRootPassword string

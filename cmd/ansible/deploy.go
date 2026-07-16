@@ -42,11 +42,12 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 			// Prepare playbook variables from config
 			v := c.config
 			vars := ansible.PlaybookVars{
-				TargetGroup: group,
-				DataRoot:    v.GetString("docker.data_root"),
-				NetworkName: v.GetString("docker.network_name"),
-				CIDR:        v.GetString("docker.cidr"),
-				NamePrefix:  v.GetString("docker.name_prefix"),
+				TargetGroup:     group,
+				DataRoot:        v.GetString("docker.data_root"),
+				NetworkName:     v.GetString("docker.network_name"),
+				CIDR:            v.GetString("docker.cidr"),
+				NamePrefix:      v.GetString("docker.name_prefix"),
+				RegistryMirrors: v.GetStringSlice("docker.registry_mirrors"),
 			}
 
 			if vars.DataRoot == "" {
@@ -60,6 +61,13 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 			}
 			if vars.NamePrefix == "" {
 				vars.NamePrefix = "opsvault"
+			}
+			if len(vars.RegistryMirrors) == 0 {
+				vars.RegistryMirrors = []string{
+					"https://mirror.ccs.tencentyun.com",
+					"https://docker.1panel.live",
+					"https://docker.m.daocloud.io",
+				}
 			}
 
 			// Service specific configuration injection

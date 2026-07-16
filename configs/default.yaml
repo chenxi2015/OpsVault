@@ -6,6 +6,10 @@ docker:
   data_root: /data/opsvault  # 宿主机数据挂载的根目录
   name_prefix: opsvault  # 容器与网络名称的统一前缀
   network_name: opsvault-net  # Docker 网络桥接网卡名称
+  registry_mirrors:  # Docker 镜像源加速源列表（部署或初始化时自动注入 /etc/docker/daemon.json）
+    - https://mirror.ccs.tencentyun.com
+    - https://docker.1panel.live
+    - https://docker.m.daocloud.io
   resource_limit:
     cpu_max: "2"  # 每个容器分配的最大 CPU 核心数
     mem_max: 2g  # 每个容器分配的最大内存限制
