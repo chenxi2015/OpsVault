@@ -20,7 +20,7 @@ mysql:
 nginx:
   install_path: /usr/local/nginx  # Nginx 安装目录（仅 binary 模式生效）
   logrotate_path: /etc/logrotate.d/nginx  # Nginx 日志轮转配置文件路径
-  openssl_version: 1.1.1w  # 编译 Nginx 时使用的 OpenSSL 版本
+  openssl_version: latest   # 编译 Nginx 时使用的 OpenSSL 版本，latest=安装时自动获取最新稳定版
   pcre_version: "8.45"  # 编译 Nginx 时使用的 PCRE 版本
   run_group: www  # Nginx 运行时的用户组
   run_user: www  # Nginx 运行时的用户名

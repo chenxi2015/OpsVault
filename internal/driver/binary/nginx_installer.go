@@ -2,6 +2,7 @@ package binary
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -56,6 +58,15 @@ func newNginxInstaller(cfg *viper.Viper) *nginxInstaller {
 }
 
 func newNginxInstallPlan(cfg *viper.Viper) nginxInstallPlan {
+	opensslVer := configString(cfg, "nginx.openssl_version", "latest")
+	if opensslVer == "" || strings.EqualFold(opensslVer, "latest") {
+		resolved, err := resolveLatestOpenSSLVersion()
+		if err != nil {
+			log.Printf("[warn] failed to resolve latest OpenSSL version, falling back to 3.0.15: %v", err)
+			resolved = "3.0.15"
+		}
+		opensslVer = resolved
+	}
 	return nginxInstallPlan{
 		sourceRoot:      configString(cfg, "nginx.source_root", "/usr/local/src/opsvault-nginx"),
 		installPath:     configString(cfg, "nginx.install_path", "/usr/local/nginx"),
@@ -66,7 +77,7 @@ func newNginxInstallPlan(cfg *viper.Viper) nginxInstallPlan {
 		runGroup:        configString(cfg, "nginx.run_group", "www"),
 		version:         configString(cfg, "nginx.version", "1.31.0"),
 		pcreVersion:     configString(cfg, "nginx.pcre_version", "8.45"),
-		opensslVersion:  configString(cfg, "nginx.openssl_version", "1.1.1w"),
+		opensslVersion:  opensslVer,
 		modulesOptions:  cfg.GetStringSlice("nginx.modules_options"),
 		systemdUnitPath: configString(cfg, "nginx.systemd_unit_path", "/lib/systemd/system/nginx.service"),
 		logrotatePath:   configString(cfg, "nginx.logrotate_path", "/etc/logrotate.d/nginx"),
@@ -166,12 +177,14 @@ func (i *nginxInstaller) ensureHostDependencies() error {
 }
 
 func (i *nginxInstaller) ensureRuntimeUser() error {
+	// Use getent to silently check group/user existence without polluting logs
 	if output, err := runNginxCommand("", "getent", "group", i.plan.runGroup); err != nil {
 		if output, err = runNginxCommand("", "groupadd", i.plan.runGroup); err != nil {
 			return fmt.Errorf("create nginx group %s: %w: %s", i.plan.runGroup, err, string(output))
 		}
 	}
-	if output, err := runNginxCommand("", "id", "-u", i.plan.runUser); err != nil {
+	// getent passwd exits non-zero when the user does not exist, no stderr noise
+	if output, err := runNginxCommand("", "getent", "passwd", i.plan.runUser); err != nil {
 		if output, err = runNginxCommand("", "useradd", "-g", i.plan.runGroup, "-M", "-s", "/sbin/nologin", i.plan.runUser); err != nil {
 			return fmt.Errorf("create nginx user %s: %w: %s", i.plan.runUser, err, string(output))
 		}
@@ -345,11 +358,57 @@ func downloadFile(target, sourceURL string) error {
 	return os.Rename(tmp, target)
 }
 
+// opensslSourceURL returns the GitHub Releases download URL for the given OpenSSL version.
+// Using GitHub directly is more stable than openssl.org which may redirect or 404.
 func opensslSourceURL(version string) string {
-	if strings.HasPrefix(version, "1.1.") {
-		return "https://www.openssl.org/source/old/1.1.1/openssl-" + version + ".tar.gz"
+	tag := "openssl-" + version
+	return "https://github.com/openssl/openssl/releases/download/" + tag + "/openssl-" + version + ".tar.gz"
+}
+
+// resolveLatestOpenSSLVersion queries the GitHub Releases API and returns the
+// latest stable OpenSSL 3.x version string (e.g. "3.5.0").
+func resolveLatestOpenSSLVersion() (string, error) {
+	log.Println("[info] resolving latest stable OpenSSL version from GitHub...")
+
+	type release struct {
+		TagName    string `json:"tag_name"`
+		Prerelease bool   `json:"prerelease"`
+		Draft      bool   `json:"draft"`
 	}
-	return "https://www.openssl.org/source/openssl-" + version + ".tar.gz"
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	req, _ := http.NewRequest(http.MethodGet,
+		"https://api.github.com/repos/openssl/openssl/releases?per_page=30", nil)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "OpsVault/1.0")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("github api request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("github api status: %s", resp.Status)
+	}
+
+	var releases []release
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return "", fmt.Errorf("decode github response: %w", err)
+	}
+
+	// Match stable 3.x tags: openssl-3.x.y
+	re := regexp.MustCompile(`^openssl-(3\.\d+\.\d+)$`)
+	for _, r := range releases {
+		if r.Prerelease || r.Draft {
+			continue
+		}
+		if m := re.FindStringSubmatch(r.TagName); len(m) == 2 {
+			log.Printf("[info] resolved OpenSSL latest stable version: %s", m[1])
+			return m[1], nil
+		}
+	}
+	return "", fmt.Errorf("no stable OpenSSL 3.x release found in GitHub API response")
 }
 
 func renderNginxBaseConfig(plan nginxInstallPlan) string {
