@@ -1,13 +1,13 @@
 package ansiblecmd
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"OpsVault/internal/driver/ansible"
+	"OpsVault/pkg/credutil"
 	"OpsVault/pkg/versionutil"
 
 	"github.com/spf13/cobra"
@@ -195,6 +195,38 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 			}
 
 			fmt.Printf("Deployment of %s completed successfully.\n", service)
+
+			var creds []credutil.Credential
+			switch service {
+			case "mysql":
+				creds = []credutil.Credential{
+					{Label: "目标分组", Value: group},
+					{Label: "端口", Value: fmt.Sprintf("%d", vars.MySQLPort)},
+					{Label: "用户名", Value: "root"},
+					{Label: "密  码", Value: vars.MySQLRootPassword},
+				}
+			case "redis":
+				pwd := vars.RedisPassword
+				if pwd == "" {
+					pwd = "(无认证)"
+				}
+				creds = []credutil.Credential{
+					{Label: "目标分组", Value: group},
+					{Label: "端口", Value: fmt.Sprintf("%d", vars.RedisPort)},
+					{Label: "密  码", Value: pwd},
+				}
+			case "rabbitmq":
+				creds = []credutil.Credential{
+					{Label: "目标分组", Value: group},
+					{Label: "管理界面", Value: fmt.Sprintf("http://<目标主机>:%d", vars.RabbitMQUIPort)},
+					{Label: "AMQP 端口", Value: fmt.Sprintf("%d", vars.RabbitMQPort)},
+					{Label: "用户名", Value: vars.RabbitMQUser},
+					{Label: "密  码", Value: vars.RabbitMQPwd},
+				}
+			}
+			if len(creds) > 0 {
+				credutil.PrintCredentials(strings.ToUpper(service), creds)
+			}
 			return nil
 		},
 	}
@@ -207,9 +239,5 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 }
 
 func generateRandomPassword() string {
-	bytes := make([]byte, 8)
-	if _, err := rand.Read(bytes); err != nil {
-		return "DefaultPassword123"
-	}
-	return hex.EncodeToString(bytes)
+	return credutil.GenPassword(20)
 }
