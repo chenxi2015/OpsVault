@@ -676,3 +676,17 @@ var UninstallTemplates = map[string]string{
 {{- end }}
 `,
 }
+
+// ReloadTemplates contains built-in ansible playbooks for reloading services.
+var ReloadTemplates = map[string]string{
+	"nginx": `---
+- name: Reload Nginx Service
+  hosts: {{ .TargetGroup }}
+  become: yes
+  tasks:
+    - name: Reload Nginx systemd service
+      systemd:
+        name: nginx
+        state: reloaded
+`,
+}

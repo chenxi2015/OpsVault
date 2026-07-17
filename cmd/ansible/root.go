@@ -74,6 +74,7 @@ func NewCommand(cfg *viper.Viper) *cobra.Command {
 		c.newDeployCommand(),
 		c.newPushCommand(),
 		c.newUninstallCommand(),
+		c.newReloadCommand(),
 	)
 	return cmd
 }

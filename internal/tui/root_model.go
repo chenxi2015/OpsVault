@@ -651,6 +651,8 @@ func (m *RootModel) handleShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		actionID = ActionStop
 	case "r":
 		actionID = ActionRestart
+	case "c":
+		actionID = ActionReload
 	case "u":
 		actionID = ActionUpgrade
 	case "i":

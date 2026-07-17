@@ -22,6 +22,7 @@ func NewCommand(cfg *viper.Viper) *cobra.Command {
 		c.newStartCommand(),
 		c.newStopCommand(),
 		c.newRestartCommand(),
+		c.newReloadCommand(),
 		c.newUninstallCommand(),
 		c.newUpgradeCommand(),
 		c.newVHostCommand(),

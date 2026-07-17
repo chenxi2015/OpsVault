@@ -197,3 +197,42 @@ func GenerateUninstallPlaybookFile(tempDir string, serviceName string, vars Play
 
 	return tempFile, nil
 }
+
+// GenerateReloadPlaybookFile parses the reload playbook template and writes it to a temporary file.
+func GenerateReloadPlaybookFile(tempDir string, serviceName string, vars PlaybookVars) (string, error) {
+	if vars.TargetGroup == "" {
+		vars.TargetGroup = "all"
+	}
+
+	tmplStr, exists := ReloadTemplates[serviceName]
+	if !exists {
+		return "", fmt.Errorf("reload playbook template for service %s not found", serviceName)
+	}
+
+	funcMap := template.FuncMap{
+		"indent": indentLines,
+		"join":   strings.Join,
+	}
+
+	tmpl, err := template.New(serviceName + "_reload").Funcs(funcMap).Parse(tmplStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse reload playbook template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, vars); err != nil {
+		return "", fmt.Errorf("failed to execute reload playbook template: %w", err)
+	}
+
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create temp dir %s: %w", tempDir, err)
+	}
+
+	tempFile := filepath.Join(tempDir, fmt.Sprintf("%s_reload_playbook.yml", serviceName))
+	if err := os.WriteFile(tempFile, buf.Bytes(), 0600); err != nil {
+		return "", fmt.Errorf("failed to write reload playbook file: %w", err)
+	}
+
+	return tempFile, nil
+}
+

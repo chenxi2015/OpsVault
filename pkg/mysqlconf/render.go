@@ -16,6 +16,7 @@ innodb_log_file_size=64M
 slow_query_log=1
 slow_query_log_file=/var/log/mysql/slow.log
 long_query_time=2
+sql_mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
 
 [client]
 default-character-set=utf8mb4

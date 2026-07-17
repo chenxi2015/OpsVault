@@ -80,3 +80,66 @@ func TestGeneratePlaybookFile(t *testing.T) {
 	}
 }
 
+func TestGenerateReloadPlaybookFile(t *testing.T) {
+	tempDir := "./test_playbook_tmp"
+	defer os.RemoveAll(tempDir)
+
+	vars := PlaybookVars{
+		TargetGroup: "web_servers",
+	}
+
+	t.Run("nginx", func(t *testing.T) {
+		playbookPath, err := GenerateReloadPlaybookFile(tempDir, "nginx", vars)
+		if err != nil {
+			t.Fatalf("failed to generate reload playbook for nginx: %v", err)
+		}
+
+		contentBytes, err := os.ReadFile(playbookPath)
+		if err != nil {
+			t.Fatalf("failed to read generated reload playbook: %v", err)
+		}
+		content := string(contentBytes)
+
+		var parsed []map[string]interface{}
+		if err := yaml.Unmarshal(contentBytes, &parsed); err != nil {
+			t.Errorf("generated reload playbook is not valid YAML: %v\nContent:\n%s", err, content)
+		}
+
+		if !strings.Contains(content, "state: reloaded") {
+			t.Errorf("expected reload state to be present in playbook")
+		}
+	})
+}
+
+func TestGenerateUninstallPlaybookFile(t *testing.T) {
+	tempDir := "./test_playbook_tmp"
+	defer os.RemoveAll(tempDir)
+
+	vars := PlaybookVars{
+		TargetGroup: "web_servers",
+		Purge:       true,
+	}
+
+	t.Run("nginx", func(t *testing.T) {
+		playbookPath, err := GenerateUninstallPlaybookFile(tempDir, "nginx", vars)
+		if err != nil {
+			t.Fatalf("failed to generate uninstall playbook for nginx: %v", err)
+		}
+
+		contentBytes, err := os.ReadFile(playbookPath)
+		if err != nil {
+			t.Fatalf("failed to read generated uninstall playbook: %v", err)
+		}
+		content := string(contentBytes)
+
+		var parsed []map[string]interface{}
+		if err := yaml.Unmarshal(contentBytes, &parsed); err != nil {
+			t.Errorf("generated uninstall playbook is not valid YAML: %v\nContent:\n%s", err, content)
+		}
+
+		if !strings.Contains(content, "systemctl stop nginx") {
+			t.Errorf("expected nginx service stop task in playbook")
+		}
+	})
+}
+
