@@ -3,10 +3,12 @@ package nginx
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"OpsVault/pkg/logger"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -14,20 +16,20 @@ const (
 	sslCronComment = "# Managed by OpsVault — auto SSL certificate renewal"
 )
 
-func newSSLCronCommand(opsvaultBin string) *cobra.Command {
+func newSSLCronCommand(cfg *viper.Viper, opsvaultBin string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cron",
 		Short: "Manage automatic SSL certificate renewal cron job",
 	}
 	cmd.AddCommand(
-		newSSLCronEnableCommand(opsvaultBin),
+		newSSLCronEnableCommand(cfg, opsvaultBin),
 		newSSLCronDisableCommand(),
 		newSSLCronStatusCommand(),
 	)
 	return cmd
 }
 
-func newSSLCronEnableCommand(opsvaultBin string) *cobra.Command {
+func newSSLCronEnableCommand(cfg *viper.Viper, opsvaultBin string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "enable",
 		Short: "Register a monthly cron job to auto-renew all SSL certificates",
@@ -39,9 +41,16 @@ func newSSLCronEnableCommand(opsvaultBin string) *cobra.Command {
 				}
 				opsvaultBin = bin
 			}
-			content := fmt.Sprintf("%s\n0 3 1 * * root %s nginx ssl renew >> /data/opsvault/logs/ssl-renew.log 2>&1\n",
+			logDir := cfg.GetString("log.storage_path")
+			if logDir == "" {
+				logDir = "/data/opsvault/logs"
+			}
+			logFile := filepath.Join(logDir, "ssl-renew.log")
+
+			content := fmt.Sprintf("%s\n0 3 1 * * root %s nginx ssl renew >> %s 2>&1\n",
 				sslCronComment,
 				opsvaultBin,
+				logFile,
 			)
 			if err := os.WriteFile(sslCronFile, []byte(content), 0o644); err != nil {
 				return fmt.Errorf("write cron file %s: %w", sslCronFile, err)
@@ -49,7 +58,7 @@ func newSSLCronEnableCommand(opsvaultBin string) *cobra.Command {
 			logger.AuditLog("nginx", "ssl-cron-enable", "cron=monthly", true)
 			cmd.Printf("✓ SSL auto-renewal cron registered: %s\n", sslCronFile)
 			cmd.Println("  Schedule: every 1st day of month at 03:00")
-			cmd.Printf("  Log: /data/opsvault/logs/ssl-renew.log\n")
+			cmd.Printf("  Log: %s\n", logFile)
 			return nil
 		},
 	}
