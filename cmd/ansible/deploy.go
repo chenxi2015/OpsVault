@@ -64,9 +64,32 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 			}
 			if len(vars.RegistryMirrors) == 0 {
 				vars.RegistryMirrors = []string{
-					"https://mirror.ccs.tencentyun.com",
-					"https://docker.1panel.live",
+					"https://docker.1panel.dev",
+					"https://docker.foreverlink.love",
+					"https://docker.xn--6oq72ry9d5zx.cn",
+					"https://docker.zhai.cm",
+					"https://docker.5z5f.com",
+					"https://a.ussh.net",
+					"https://docker.cloudlayer.icu",
+					"https://hub.littlediary.cn",
+					"https://hub.crdz.gq",
+					"https://docker.unsee.tech",
+					"https://docker.kejilion.pro",
+					"https://registry.dockermirror.com",
+					"https://hub.rat.dev",
+					"https://dhub.kubesre.xyz",
+					"https://docker.nastool.de",
+					"https://docker.udayun.com",
+					"https://docker.rainbond.cc",
+					"https://docker.1panelproxy.com",
+					"https://atomhub.openatom.cn",
 					"https://docker.m.daocloud.io",
+					"https://docker.1ms.run",
+					"https://docker.linkedbus.com",
+					"https://dytt.online",
+					"https://func.ink",
+					"https://lispy.org",
+					"https://docker.xiaogenban1993.com",
 				}
 			}
 

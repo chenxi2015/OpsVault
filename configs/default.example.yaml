@@ -7,9 +7,32 @@ docker:
   name_prefix: opsvault  # 容器与网络名称的统一前缀
   network_name: opsvault-net  # Docker 网络桥接网卡名称
   registry_mirrors:  # Docker 镜像源加速源列表（部署或初始化时自动注入 /etc/docker/daemon.json）
-    - https://mirror.ccs.tencentyun.com
-    - https://docker.1panel.live
+    - https://docker.1panel.dev
+    - https://docker.foreverlink.love
+    - https://docker.xn--6oq72ry9d5zx.cn
+    - https://docker.zhai.cm
+    - https://docker.5z5f.com
+    - https://a.ussh.net
+    - https://docker.cloudlayer.icu
+    - https://hub.littlediary.cn
+    - https://hub.crdz.gq
+    - https://docker.unsee.tech
+    - https://docker.kejilion.pro
+    - https://registry.dockermirror.com
+    - https://hub.rat.dev
+    - https://dhub.kubesre.xyz
+    - https://docker.nastool.de
+    - https://docker.udayun.com
+    - https://docker.rainbond.cc
+    - https://docker.1panelproxy.com
+    - https://atomhub.openatom.cn
     - https://docker.m.daocloud.io
+    - https://docker.1ms.run
+    - https://docker.linkedbus.com
+    - https://dytt.online
+    - https://func.ink
+    - https://lispy.org
+    - https://docker.xiaogenban1993.com
   resource_limit:
     cpu_max: "2"  # 每个容器分配的最大 CPU 核心数
     mem_max: 2g  # 每个容器分配的最大内存限制
