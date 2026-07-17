@@ -53,4 +53,3 @@ func (m Manager) Delete(domain string) error {
 	}
 	return os.RemoveAll(filepath.Join(m.SSLRoot, domain))
 }
-
