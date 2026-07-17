@@ -1,9 +1,12 @@
 package ansiblecmd
 
 import (
+	"bytes"
 	"fmt"
-	"os"
 
+	"OpsVault/internal/driver/ansible"
+
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -20,14 +23,58 @@ func (c *commandSet) newPingCommand() *cobra.Command {
 			defer cleanup()
 
 			fmt.Printf("Pinging hosts in group: %s...\n", group)
-			err = exec.RunAnsible(cmd.Context(), group, "ping", "", os.Stdout, os.Stderr)
-			if err != nil {
-				return fmt.Errorf("ping command failed: %w", err)
+
+			var stdoutBuf bytes.Buffer
+			var stderrBuf bytes.Buffer
+
+			_ = exec.RunAnsible(cmd.Context(), group, "ping", "", &stdoutBuf, &stderrBuf)
+
+			results := ansible.ParsePingOutput(stdoutBuf.String())
+			if len(results) == 0 {
+				fmt.Println("No ping results returned from remote hosts.")
+				if stderrBuf.Len() > 0 {
+					fmt.Printf("Error logs:\n%s\n", stderrBuf.String())
+				}
+				return fmt.Errorf("ping command failed")
 			}
-			fmt.Println("Ping completed successfully.")
+
+			// Render Table Headers
+			ipHeader := headerStyle.Width(20).Render("HOST IP")
+			statusHeader := headerStyle.Width(15).Render("STATUS")
+			messageHeader := headerStyle.Width(60).Render("MESSAGE")
+
+			cmd.Println("\n" + lipgloss.JoinHorizontal(lipgloss.Top, ipHeader, statusHeader, messageHeader))
+
+			hasFailed := false
+			for _, r := range results {
+				ipRow := rowStyle.Width(20).Render(r.IP)
+
+				var statusVal string
+				switch r.Status {
+				case "SUCCESS", "CHANGED":
+					statusVal = successText.Render(r.Status)
+				case "FAILED":
+					statusVal = failText.Render(r.Status)
+					hasFailed = true
+				default:
+					statusVal = failText.Render(r.Status)
+					hasFailed = true
+				}
+				statusRow := rowStyle.Width(15).Render(statusVal)
+				messageRow := rowStyle.Width(60).Render(r.Message)
+
+				cmd.Println(lipgloss.JoinHorizontal(lipgloss.Top, ipRow, statusRow, messageRow))
+			}
+			cmd.Println()
+
+			if hasFailed {
+				return fmt.Errorf("some hosts failed to ping")
+			}
+			cmd.Println("Ping completed successfully.")
 			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&group, "group", "g", "all", "target host group to ping")
 	return cmd
 }
+

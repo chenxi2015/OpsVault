@@ -11,3 +11,5 @@ configs/ansible.*.yaml
 configs/default.yaml
 !configs/ansible.example.yaml
 ansible_tmp/
+opsvault_data/ansible/tmp
+opsvault_data/logs

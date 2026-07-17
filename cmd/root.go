@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	ansiblecmd "OpsVault/cmd/ansible"
@@ -100,6 +101,7 @@ func init() {
 	rootCmd.AddCommand(gitlab.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(minio.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(newBakCommand(config))
+	rootCmd.AddCommand(newMigrateCommand(config))
 	rootCmd.AddCommand(ansiblecmd.NewCommand(config))
 }
 
@@ -125,6 +127,8 @@ func initConfig() error {
 			return fmt.Errorf("read config: %w", err)
 		}
 	}
+
+	resolveFallbackPaths(config)
 	return nil
 }
 
@@ -145,10 +149,11 @@ func CurrentMode(v *viper.Viper) driver.Mode {
 }
 
 func applyDefaultConfig(v *viper.Viper) {
+	v.SetDefault("system.root_dir", "/data/opsvault")
 	v.SetDefault("docker.name_prefix", "opsvault")
 	v.SetDefault("docker.network_name", "opsvault-net")
 	v.SetDefault("docker.cidr", "172.28.0.0/16")
-	v.SetDefault("docker.data_root", "/data/opsvault")
+	v.SetDefault("docker.data_root", "")
 	v.SetDefault("docker.bind_ip", "0.0.0.0")
 	v.SetDefault("docker.resource_limit.cpu_max", "2")
 	v.SetDefault("docker.resource_limit.mem_max", "2g")
@@ -207,12 +212,88 @@ func applyDefaultConfig(v *viper.Viper) {
 	v.SetDefault("minio.root_password", "")
 	v.SetDefault("log.level", "info")
 
-	v.SetDefault("log.storage_path", "/data/opsvault/logs")
-	v.SetDefault("backup.storage_path", "/data/opsvault/bak")
+	v.SetDefault("log.storage_path", "")
+	v.SetDefault("backup.storage_path", "")
 
 	v.SetDefault("ansible.bin_path", "ansible")
 	v.SetDefault("ansible.playbook_bin_path", "ansible-playbook")
-	v.SetDefault("ansible.temp_dir", "/data/opsvault/ansible/tmp")
+	v.SetDefault("ansible.temp_dir", "")
+}
+
+func resolveFallbackPaths(v *viper.Viper) {
+	rootDir := v.GetString("system.root_dir")
+	if rootDir == "" {
+		rootDir = "/data/opsvault"
+		v.Set("system.root_dir", rootDir)
+	}
+
+	if v.GetString("docker.data_root") == "" {
+		v.Set("docker.data_root", rootDir)
+	}
+
+	backupPath := v.GetString("backup.storage_path")
+	if backupPath == "" {
+		backupPath = filepath.Join(rootDir, "bak")
+	}
+
+	tempDir := v.GetString("ansible.temp_dir")
+	if tempDir == "" {
+		tempDir = filepath.Join(rootDir, "ansible", "tmp")
+	}
+
+	logPath := v.GetString("log.storage_path")
+	if logPath == "" {
+		logPath = filepath.Join(rootDir, "logs")
+	}
+
+	// 针对本地需要创建读写的目录，若无权限写入（例如在 macOS 上系统根目录只读），则自动优雅回退到当前工作目录下的 opsvault_data 目录中
+	localFallbackRoot := "./opsvault_data"
+
+	if !isPathWritable(backupPath) {
+		backupPath = filepath.Join(localFallbackRoot, "bak")
+	}
+	v.Set("backup.storage_path", backupPath)
+
+	if !isPathWritable(tempDir) {
+		tempDir = filepath.Join(localFallbackRoot, "ansible", "tmp")
+	}
+	v.Set("ansible.temp_dir", tempDir)
+
+	if !isPathWritable(logPath) {
+		logPath = filepath.Join(localFallbackRoot, "logs")
+	}
+	v.Set("log.storage_path", logPath)
+}
+
+func isPathWritable(path string) bool {
+	if path == "" {
+		return false
+	}
+	current := path
+	for {
+		info, err := os.Stat(current)
+		if err == nil {
+			if !info.IsDir() {
+				return false
+			}
+			// 尝试创建测试文件以判断目录是否可写
+			tmpFile := filepath.Join(current, ".opsvault_write_test")
+			f, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+			if err != nil {
+				return false
+			}
+			f.Close()
+			_ = os.Remove(tmpFile)
+			return true
+		}
+
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+	return false
 }
 
 func newDockerClient() (*client.Client, error) {

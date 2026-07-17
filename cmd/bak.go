@@ -74,16 +74,21 @@ func newBakCreateCommand(cfg *viper.Viper) *cobra.Command {
 			sizeStr := formatBytes(meta.SizeBytes)
 			servicesStr := strings.Join(meta.Services, ", ")
 
+			labelStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+			valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
+			servicesValueStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("11"))
+
 			cardContent := fmt.Sprintf(
-				"%s\n\n%s  %s\n%s  %s\n%s  %s\n%s  %s",
+				"%s\n\n%s  %s\n%s  %s\n%s  %s\n%s  %s\n%s  %s",
 				lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("✓ Backup Created Successfully"),
-				lipgloss.NewStyle().Bold(true).Render("Name:       "), meta.Name,
-				lipgloss.NewStyle().Bold(true).Render("Services:   "), servicesStr,
-				lipgloss.NewStyle().Bold(true).Render("Size:       "), sizeStr,
-				lipgloss.NewStyle().Bold(true).Render("Time:       "), meta.Timestamp.Format("2006-01-02 15:04:05"),
+				labelStyle.Render("Name:       "), valueStyle.Render(meta.Name),
+				labelStyle.Render("Services:   "), servicesValueStyle.Render(servicesStr),
+				labelStyle.Render("Directory:  "), valueStyle.Render(manager.GetBackupDir()),
+				labelStyle.Render("Size:       "), valueStyle.Render(sizeStr),
+				labelStyle.Render("Time:       "), valueStyle.Render(meta.Timestamp.Format("2006-01-02 15:04:05")),
 			)
 			if meta.Description != "" {
-				cardContent += fmt.Sprintf("\n%s  %s", lipgloss.NewStyle().Bold(true).Render("Desc:       "), meta.Description)
+				cardContent += fmt.Sprintf("\n%s  %s", labelStyle.Render("Desc:       "), valueStyle.Render(meta.Description))
 			}
 
 			cmd.Println(bakSuccessCard.Render(cardContent))

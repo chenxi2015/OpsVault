@@ -1,9 +1,18 @@
+system:
+  root_dir: /data/opsvault  # OpsVault 全局安装与数据存储根路径
 backup:
-  storage_path: /data/opsvault/bak  # 配置文件备份存储路径
+  storage_path: ""  # 配置文件备份存储路径（留空则默认使用 {system.root_dir}/bak）
+  exclude_dirs:     # 备份 system_root 时需要排除的子目录名称
+    - "data"
+    - "logs"
+    - "log"
+    - "wwwlogs"
+    - "bin"
+    - "wwwroot"
 docker:
   bind_ip: 0.0.0.0  # 容器端口在宿主机上绑定的IP地址
   cidr: 172.28.0.0/16  # 专用桥接网络的 CIDR 网段
-  data_root: /data/opsvault  # 宿主机数据挂载的根目录
+  data_root: ""  # 宿主机数据挂载的根目录（留空则默认使用 {system.root_dir}）
   name_prefix: opsvault  # 容器与网络名称的统一前缀
   network_name: opsvault-net  # Docker 网络桥接网卡名称
   registry_mirrors:  # Docker 镜像源加速源列表（部署或初始化时自动注入 /etc/docker/daemon.json）

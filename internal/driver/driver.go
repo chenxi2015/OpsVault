@@ -61,3 +61,8 @@ type SSLManager interface {
 	RenewSSL(domain string) error
 	DeleteSSL(domain string) error
 }
+
+type Migrator interface {
+	MigrateHost(targetHost string, syncData bool) error
+	MigrateEngine(targetMode Mode) error
+}

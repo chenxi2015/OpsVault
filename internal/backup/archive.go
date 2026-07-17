@@ -8,84 +8,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
 	"OpsVault/pkg/fileutil"
 	"OpsVault/pkg/logger"
-
-	"github.com/spf13/viper"
 )
-
-// BackupMetadata holds information about a configuration backup.
-type BackupMetadata struct {
-	Name        string    `json:"name"`
-	Timestamp   time.Time `json:"timestamp"`
-	Services    []string  `json:"services"`
-	SizeBytes   int64     `json:"size_bytes"`
-	Description string    `json:"description"`
-}
-
-// BackupManager coordinates config backup and restore operations.
-type BackupManager struct {
-	config *viper.Viper
-}
-
-// NewBackupManager creates a new BackupManager instance.
-func NewBackupManager(cfg *viper.Viper) *BackupManager {
-	return &BackupManager{config: cfg}
-}
-
-// GetBackupDir returns the directory where backups are stored.
-func (m *BackupManager) GetBackupDir() string {
-	dir := m.config.GetString("backup.storage_path")
-	if dir == "" {
-		// Fallback to docker data root/bak
-		dataRoot := m.config.GetString("docker.data_root")
-		if dataRoot == "" {
-			dataRoot = "/data/opsvault"
-		}
-		dir = filepath.Join(dataRoot, "bak")
-	}
-	return dir
-}
-
-// ResolveConfigPaths resolves the host configuration file or directory paths for each service.
-func (m *BackupManager) ResolveConfigPaths() map[string]string {
-	dataRoot := m.config.GetString("docker.data_root")
-	if dataRoot == "" {
-		dataRoot = "/data/opsvault"
-	}
-
-	nginxInstallPath := m.config.GetString("nginx.install_path")
-	if nginxInstallPath == "" {
-		nginxInstallPath = "/usr/local/nginx"
-	}
-
-	paths := map[string]string{
-		"nginx":    filepath.Join(nginxInstallPath, "conf"),
-		"mysql":    filepath.Join(dataRoot, "mysql", "conf"),
-		"redis":    filepath.Join(dataRoot, "redis", "conf"),
-		"rocketmq": filepath.Join(dataRoot, "rocketmq", "conf"),
-		"rabbitmq": filepath.Join(dataRoot, "rabbitmq", "conf"),
-		"postgres": filepath.Join(dataRoot, "postgres", "conf"),
-		"elk":      filepath.Join(dataRoot, "elk", "conf"),
-	}
-
-	// Add global configuration file if loaded
-	cfgFile := m.config.ConfigFileUsed()
-	if cfgFile != "" {
-		paths["global"] = cfgFile
-	} else {
-		// Try to see if default.yaml exists in configs
-		if _, err := os.Stat("configs/default.yaml"); err == nil {
-			paths["global"] = "configs/default.yaml"
-		}
-	}
-
-	return paths
-}
 
 // CreateBackup creates a new config backup for the specified services.
 // If services is empty or contains "all", it backs up all configured services.
@@ -107,9 +35,23 @@ func (m *BackupManager) CreateBackup(services []string, customName, description 
 	// Determine which services we are backing up and filter out non-existent paths
 	var targets []string
 	if backupAll {
-		for s := range resolvedPaths {
-			targets = append(targets, s)
+		// For full backups, we backup system_root and only include nginx configurations
+		// if nginx configuration directory is physically located outside system_root.
+		targets = []string{"system_root"}
+
+		nginxPath := resolvedPaths["nginx"]
+		if _, err := os.Stat(nginxPath); err == nil {
+			absNginx, errN := filepath.Abs(nginxPath)
+			absRoot, errR := filepath.Abs(resolvedPaths["system_root"])
+			if errN == nil && errR == nil {
+				if !strings.HasPrefix(absNginx, absRoot+string(filepath.Separator)) && absNginx != absRoot {
+					targets = append(targets, "nginx")
+				}
+			} else {
+				targets = append(targets, "nginx")
+			}
 		}
+
 	} else {
 		for _, s := range services {
 			name := strings.ToLower(s)
@@ -207,45 +149,6 @@ func (m *BackupManager) CreateBackup(services []string, customName, description 
 	return meta, nil
 }
 
-// ListBackups returns a list of all available backups sorted by timestamp descending.
-func (m *BackupManager) ListBackups() ([]*BackupMetadata, error) {
-	backupDir := m.GetBackupDir()
-	if _, err := os.Stat(backupDir); os.IsNotExist(err) {
-		return nil, nil
-	}
-
-	files, err := os.ReadDir(backupDir)
-	if err != nil {
-		return nil, fmt.Errorf("read backup dir: %w", err)
-	}
-
-	var backups []*BackupMetadata
-	for _, f := range files {
-		if !f.IsDir() && strings.HasSuffix(f.Name(), ".json") {
-			path := filepath.Join(backupDir, f.Name())
-			data, err := os.ReadFile(path)
-			if err != nil {
-				logger.Errorf("failed to read metadata file %s: %v", path, err)
-				continue
-			}
-
-			var meta BackupMetadata
-			if err := json.Unmarshal(data, &meta); err != nil {
-				logger.Errorf("failed to parse metadata file %s: %v", path, err)
-				continue
-			}
-			backups = append(backups, &meta)
-		}
-	}
-
-	// Sort backups by timestamp descending (newest first)
-	sort.Slice(backups, func(i, j int) bool {
-		return backups[i].Timestamp.After(backups[j].Timestamp)
-	})
-
-	return backups, nil
-}
-
 // RestoreBackup restores configuration from a backup.
 // If serviceName is specified, it only restores that service's config.
 func (m *BackupManager) RestoreBackup(name, serviceName string) error {
@@ -297,8 +200,20 @@ func (m *BackupManager) RestoreBackup(name, serviceName string) error {
 		service := parts[0]
 
 		// Filter by service if requested
-		if serviceName != "" && strings.ToLower(serviceName) != "all" && strings.ToLower(serviceName) != service {
-			continue
+		if serviceName != "" && strings.ToLower(serviceName) != "all" {
+			reqService := strings.ToLower(serviceName)
+			matched := false
+			if reqService == service {
+				matched = true
+			} else if reqService == "nginx" && service == "nginx_vhost" {
+				matched = true
+			} else if service == "system_root" && len(parts) > 2 && strings.ToLower(parts[2]) == reqService {
+				// If restoring a specific service and target resides in system_root, match against the folder name
+				matched = true
+			}
+			if !matched {
+				continue
+			}
 		}
 
 		targetBaseDir, ok := resolvedPaths[service]
@@ -360,22 +275,6 @@ func (m *BackupManager) RestoreBackup(name, serviceName string) error {
 	return nil
 }
 
-// DeleteBackup deletes a backup and its metadata file.
-func (m *BackupManager) DeleteBackup(name string) error {
-	backupDir := m.GetBackupDir()
-	tarGzPath := filepath.Join(backupDir, name+".tar.gz")
-	jsonPath := filepath.Join(backupDir, name+".json")
-
-	if err := fileutil.RemoveIfExists(tarGzPath); err != nil {
-		return fmt.Errorf("delete tar.gz file: %w", err)
-	}
-	if err := fileutil.RemoveIfExists(jsonPath); err != nil {
-		return fmt.Errorf("delete json metadata file: %w", err)
-	}
-
-	return nil
-}
-
 // addPathToTar walks the given sourcePath and writes it to the tar writer.
 // prefix is the top level directory name inside the tarball (e.g., "nginx").
 func (m *BackupManager) addPathToTar(tw *tar.Writer, sourcePath, prefix string) error {
@@ -394,6 +293,13 @@ func (m *BackupManager) addPathToTar(tw *tar.Writer, sourcePath, prefix string) 
 	return filepath.Walk(sourcePath, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+
+		if exclude, isDir := m.shouldExclude(path, prefix, fi.IsDir()); exclude {
+			if isDir {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 
 		// Create the relative path inside the tarball

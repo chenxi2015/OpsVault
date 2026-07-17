@@ -2,6 +2,7 @@ package ansible
 
 import (
 	"bufio"
+	"encoding/json"
 	"regexp"
 	"strings"
 )
@@ -140,3 +141,120 @@ func parseHostMetrics(h *HostStatus) {
 		}
 	}
 }
+
+var pingHeaderRegexp = regexp.MustCompile(`^([a-zA-Z0-9\.\-_]+) \| (SUCCESS|CHANGED|FAILED|UNREACHABLE)(?:!)?\s*=>`)
+
+// PingStatus holds the parsed system ping metrics.
+type PingStatus struct {
+	IP      string
+	Status  string
+	Message string
+}
+
+// ParsePingOutput parses the raw terminal stdout of the ping ad-hoc command.
+func ParsePingOutput(raw string) []PingStatus {
+	var results []PingStatus
+	scanner := bufio.NewScanner(strings.NewReader(raw))
+
+	type hostRaw struct {
+		IP     string
+		Status string
+		Lines  []string
+	}
+	var current *hostRaw
+	var hosts []hostRaw
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		matches := pingHeaderRegexp.FindStringSubmatch(line)
+		if len(matches) > 0 {
+			if current != nil {
+				hosts = append(hosts, *current)
+			}
+			current = &hostRaw{
+				IP:     matches[1],
+				Status: matches[2],
+			}
+			if strings.Contains(line, "{") {
+				current.Lines = append(current.Lines, "{")
+			}
+		} else {
+			if current != nil {
+				current.Lines = append(current.Lines, line)
+			}
+		}
+	}
+	if current != nil {
+		hosts = append(hosts, *current)
+	}
+
+	for _, h := range hosts {
+		status := h.Status
+		var msg string
+		
+		// Attempt to extract JSON from lines
+		jsonStr := extractJSONFromLines(h.Lines)
+		
+		cleanedJSON := strings.TrimSpace(jsonStr)
+		var data map[string]interface{}
+		if err := json.Unmarshal([]byte(cleanedJSON), &data); err == nil {
+			if pingVal, ok := data["ping"].(string); ok {
+				msg = pingVal
+			} else if msgVal, ok := data["msg"].(string); ok {
+				msg = msgVal
+			} else if stderrVal, ok := data["module_stderr"].(string); ok && stderrVal != "" {
+				msg = strings.TrimSpace(stderrVal)
+			}
+		} else {
+			// Fallback: join all lines if JSON extraction/parsing failed
+			msg = strings.TrimSpace(strings.Join(h.Lines, "\n"))
+		}
+
+		if msg == "" {
+			if status == "SUCCESS" || status == "CHANGED" {
+				msg = "pong"
+			} else {
+				msg = "unknown error"
+			}
+		}
+
+		msg = strings.ReplaceAll(msg, "\n", " ")
+		msg = strings.ReplaceAll(msg, "\r", "")
+		if len(msg) > 60 {
+			msg = msg[:57] + "..."
+		}
+
+		results = append(results, PingStatus{
+			IP:      h.IP,
+			Status:  status,
+			Message: msg,
+		})
+	}
+
+	return results
+}
+
+func extractJSONFromLines(lines []string) string {
+	var jsonLines []string
+	inJSON := false
+	braceCount := 0
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.Contains(trimmed, "{") {
+			inJSON = true
+			braceCount += strings.Count(trimmed, "{")
+		}
+		if inJSON {
+			jsonLines = append(jsonLines, line)
+		}
+		if strings.Contains(trimmed, "}") {
+			braceCount -= strings.Count(trimmed, "}")
+			if braceCount <= 0 && inJSON {
+				break
+			}
+		}
+	}
+	return strings.Join(jsonLines, "\n")
+}
+
+
