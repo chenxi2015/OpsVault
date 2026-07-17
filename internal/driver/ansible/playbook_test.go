@@ -39,9 +39,14 @@ func TestGeneratePlaybookFile(t *testing.T) {
 		NginxRunUser:         "www",
 		NginxRunGroup:        "www",
 		NginxSystemdUnitPath: "/lib/systemd/system/nginx.service",
+		MinIOImage:           "minio/minio:RELEASE.2024-05-10T01-39-39Z",
+		MinIOPort:            9000,
+		MinIOConsolePort:     9001,
+		MinIORootUser:        "minioadmin",
+		MinIORootPassword:    "miniopass",
 	}
 
-	services := []string{"docker", "mysql", "redis", "rabbitmq", "nginx"}
+	services := []string{"docker", "mysql", "redis", "rabbitmq", "nginx", "minio"}
 	for _, svc := range services {
 		t.Run(svc, func(t *testing.T) {
 			playbookPath, err := GeneratePlaybookFile(tempDir, svc, vars)
@@ -74,6 +79,13 @@ func TestGeneratePlaybookFile(t *testing.T) {
 			} else if svc == "nginx" {
 				if !strings.Contains(content, "worker_processes auto;") {
 					t.Errorf("expected nginx base config to be rendered in nginx playbook")
+				}
+			} else if svc == "minio" {
+				if !strings.Contains(content, "MINIO_ROOT_USER='minioadmin'") {
+					t.Errorf("expected minio root user to be rendered")
+				}
+				if !strings.Contains(content, "--console-address :9001") {
+					t.Errorf("expected minio console address to be rendered")
 				}
 			}
 		})
@@ -118,6 +130,8 @@ func TestGenerateUninstallPlaybookFile(t *testing.T) {
 	vars := PlaybookVars{
 		TargetGroup: "web_servers",
 		Purge:       true,
+		NamePrefix:  "opsvault",
+		DataRoot:    "/data/opsvault",
 	}
 
 	t.Run("nginx", func(t *testing.T) {
@@ -139,6 +153,28 @@ func TestGenerateUninstallPlaybookFile(t *testing.T) {
 
 		if !strings.Contains(content, "systemctl stop nginx") {
 			t.Errorf("expected nginx service stop task in playbook")
+		}
+	})
+
+	t.Run("minio", func(t *testing.T) {
+		playbookPath, err := GenerateUninstallPlaybookFile(tempDir, "minio", vars)
+		if err != nil {
+			t.Fatalf("failed to generate uninstall playbook for minio: %v", err)
+		}
+
+		contentBytes, err := os.ReadFile(playbookPath)
+		if err != nil {
+			t.Fatalf("failed to read generated uninstall playbook: %v", err)
+		}
+		content := string(contentBytes)
+
+		var parsed []map[string]interface{}
+		if err := yaml.Unmarshal(contentBytes, &parsed); err != nil {
+			t.Errorf("generated uninstall playbook is not valid YAML: %v\nContent:\n%s", err, content)
+		}
+
+		if !strings.Contains(content, "docker rm -f opsvault-minio") {
+			t.Errorf("expected minio container remove task in playbook")
 		}
 	})
 }

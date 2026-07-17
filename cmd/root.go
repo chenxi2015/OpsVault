@@ -10,6 +10,7 @@ import (
 	"OpsVault/cmd/elk"
 	"OpsVault/cmd/gitlab"
 	"OpsVault/cmd/jenkins"
+	"OpsVault/cmd/minio"
 	"OpsVault/cmd/mysql"
 	"OpsVault/cmd/nginx"
 	"OpsVault/cmd/postgres"
@@ -97,6 +98,7 @@ func init() {
 	rootCmd.AddCommand(elk.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(jenkins.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(gitlab.NewCommand(config, dockerFactory))
+	rootCmd.AddCommand(minio.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(newBakCommand(config))
 	rootCmd.AddCommand(ansiblecmd.NewCommand(config))
 }
@@ -198,6 +200,11 @@ func applyDefaultConfig(v *viper.Viper) {
 	v.SetDefault("gitlab.port", 8082)
 	v.SetDefault("gitlab.ssh_port", 2222)
 	v.SetDefault("gitlab.https_port", 8443)
+	v.SetDefault("minio.image", "minio/minio:RELEASE.2024-05-10T01-39-39Z")
+	v.SetDefault("minio.port", 9000)
+	v.SetDefault("minio.console_port", 9001)
+	v.SetDefault("minio.root_user", "minioadmin")
+	v.SetDefault("minio.root_password", "")
 	v.SetDefault("log.level", "info")
 
 	v.SetDefault("log.storage_path", "/data/opsvault/logs")

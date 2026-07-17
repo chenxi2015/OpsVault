@@ -24,10 +24,10 @@ func (c *commandSet) newUninstallCommand() *cobra.Command {
 			}
 
 			switch service {
-			case "docker", "mysql", "redis", "rabbitmq", "nginx":
+			case "docker", "mysql", "redis", "rabbitmq", "nginx", "minio":
 				// valid
 			default:
-				return fmt.Errorf("unsupported service: %s. Supported: docker, mysql, redis, rabbitmq, nginx", service)
+				return fmt.Errorf("unsupported service: %s. Supported: docker, mysql, redis, rabbitmq, nginx, minio", service)
 			}
 
 			exec, cleanup, err := c.getExecutor()
@@ -83,7 +83,7 @@ func (c *commandSet) newUninstallCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&service, "service", "s", "", "middleware service to uninstall (docker, mysql, redis, rabbitmq, nginx)")
+	cmd.Flags().StringVarP(&service, "service", "s", "", "middleware service to uninstall (docker, mysql, redis, rabbitmq, nginx, minio)")
 	cmd.Flags().StringVarP(&group, "group", "g", "all", "target host group for uninstallation")
 	cmd.Flags().BoolVar(&purge, "purge", false, "completely purge data volumes, config files, and website directories")
 	_ = cmd.MarkFlagRequired("service")

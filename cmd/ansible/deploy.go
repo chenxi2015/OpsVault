@@ -27,10 +27,10 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 
 			// Validate service support
 			switch service {
-			case "docker", "mysql", "redis", "rabbitmq", "nginx":
+			case "docker", "mysql", "redis", "rabbitmq", "nginx", "minio":
 				// valid
 			default:
-				return fmt.Errorf("unsupported service: %s. Supported: docker, mysql, redis, rabbitmq, nginx", service)
+				return fmt.Errorf("unsupported service: %s. Supported: docker, mysql, redis, rabbitmq, nginx, minio", service)
 			}
 
 			exec, cleanup, err := c.getExecutor()
@@ -172,6 +172,27 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 				if vars.NginxSystemdUnitPath == "" {
 					vars.NginxSystemdUnitPath = "/lib/systemd/system/nginx.service"
 				}
+			case "minio":
+				vars.MinIOImage = v.GetString("minio.image")
+				vars.MinIOPort = v.GetInt("minio.port")
+				vars.MinIOConsolePort = v.GetInt("minio.console_port")
+				vars.MinIORootUser = v.GetString("minio.root_user")
+				vars.MinIORootPassword = v.GetString("minio.root_password")
+				if vars.MinIOImage == "" {
+					vars.MinIOImage = "minio/minio:RELEASE.2024-05-10T01-39-39Z"
+				}
+				if vars.MinIOPort == 0 {
+					vars.MinIOPort = 9000
+				}
+				if vars.MinIOConsolePort == 0 {
+					vars.MinIOConsolePort = 9001
+				}
+				if vars.MinIORootUser == "" {
+					vars.MinIORootUser = "minioadmin"
+				}
+				if vars.MinIORootPassword == "" {
+					vars.MinIORootPassword = generateRandomPassword()
+				}
 			}
 
 			tempDir := v.GetString("ansible.temp_dir")
@@ -223,6 +244,14 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 					{Label: "用户名", Value: vars.RabbitMQUser},
 					{Label: "密  码", Value: vars.RabbitMQPwd},
 				}
+			case "minio":
+				creds = []credutil.Credential{
+					{Label: "目标分组", Value: group},
+					{Label: "API 端口", Value: fmt.Sprintf("%d", vars.MinIOPort)},
+					{Label: "控制台端口", Value: fmt.Sprintf("%d", vars.MinIOConsolePort)},
+					{Label: "用户名", Value: vars.MinIORootUser},
+					{Label: "密  码", Value: vars.MinIORootPassword},
+				}
 			}
 			if len(creds) > 0 {
 				credutil.PrintCredentials(strings.ToUpper(service), creds)
@@ -231,7 +260,7 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&service, "service", "s", "", "middleware service to deploy (docker, mysql, redis, rabbitmq, nginx)")
+	cmd.Flags().StringVarP(&service, "service", "s", "", "middleware service to deploy (docker, mysql, redis, rabbitmq, nginx, minio)")
 	cmd.Flags().StringVarP(&group, "group", "g", "all", "target host group for deployment")
 	_ = cmd.MarkFlagRequired("service")
 

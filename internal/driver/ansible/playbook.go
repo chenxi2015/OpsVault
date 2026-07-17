@@ -39,6 +39,11 @@ type PlaybookVars struct {
 	RabbitMQUIPort    int
 	RabbitMQUser      string
 	RabbitMQPwd       string
+	MinIOImage        string
+	MinIOPort         int
+	MinIOConsolePort  int
+	MinIORootUser     string
+	MinIORootPassword string
 	// Nginx binary driver fields
 	NginxVersion         string
 	NginxPCREVersion     string

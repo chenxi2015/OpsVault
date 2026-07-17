@@ -35,6 +35,10 @@ func testConfigWithRoot(dataRoot string) *viper.Viper {
 	cfg.Set("rocketmq.broker_port", 10911)
 	cfg.Set("postgres.image", "postgres:15")
 	cfg.Set("postgres.port", 5432)
+	cfg.Set("minio.image", "minio/minio:RELEASE.2024-05-10T01-39-39Z")
+	cfg.Set("minio.port", 9000)
+	cfg.Set("minio.console_port", 9001)
+	cfg.Set("minio.root_user", "minioadmin")
 	return cfg
 }
 
@@ -464,5 +468,49 @@ func TestDockerLogReaderCapability(t *testing.T) {
 	drv := NewMySQLDriver(WrapClient(nil), testConfigWithRoot("/data/opsvault"), "secret")
 	if _, ok := interface{}(drv).(driver.LogReader); !ok {
 		t.Fatalf("MySQLDriver does not implement driver.LogReader")
+	}
+}
+
+func TestMinIOContainerSpec(t *testing.T) {
+	drv := NewMinIODriver(WrapClient(nil), testConfigWithRoot("/data/opsvault"), "miniopass")
+	cfg, host, err := drv.containerSpec()
+	if err != nil {
+		t.Fatalf("containerSpec: %v", err)
+	}
+	if cfg.Image != "minio/minio:RELEASE.2024-05-10T01-39-39Z" {
+		t.Fatalf("image = %q", cfg.Image)
+	}
+	var foundUser, foundPass bool
+	for _, env := range cfg.Env {
+		if env == "MINIO_ROOT_USER=minioadmin" {
+			foundUser = true
+		}
+		if env == "MINIO_ROOT_PASSWORD=miniopass" {
+			foundPass = true
+		}
+	}
+	if !foundUser || !foundPass {
+		t.Fatalf("env user/pass missing, env = %#v", cfg.Env)
+	}
+	if len(host.Binds) != 1 || host.Binds[0] != filepath.Join("/data/opsvault", "minio", "data")+":/data" {
+		t.Fatalf("binds = %#v", host.Binds)
+	}
+	apiPort := nat.Port("9000/tcp")
+	consolePort := nat.Port("9001/tcp")
+	if host.PortBindings[apiPort][0].HostPort != "9000" {
+		t.Fatalf("API port binding = %#v", host.PortBindings[apiPort])
+	}
+	if host.PortBindings[consolePort][0].HostPort != "9001" {
+		t.Fatalf("Console port binding = %#v", host.PortBindings[consolePort])
+	}
+	if len(cfg.Healthcheck.Test) != 4 || cfg.Healthcheck.Test[0] != "CMD" || cfg.Healthcheck.Test[1] != "mc" || cfg.Healthcheck.Test[2] != "ready" || cfg.Healthcheck.Test[3] != "local" {
+		t.Fatalf("healthcheck test = %#v", cfg.Healthcheck.Test)
+	}
+}
+
+func TestMinIODriverCapability(t *testing.T) {
+	drv := NewMinIODriver(WrapClient(nil), testConfigWithRoot("/data/opsvault"), "secret")
+	if _, ok := interface{}(drv).(driver.LogReader); !ok {
+		t.Fatalf("MinIODriver does not implement driver.LogReader")
 	}
 }

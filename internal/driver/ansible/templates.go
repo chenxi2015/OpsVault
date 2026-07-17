@@ -559,6 +559,69 @@ var PlaybookTemplates = map[string]string{
         state: link
         force: yes
 `,
+
+	"minio": `---
+- name: Deploy MinIO via Docker
+  hosts: {{ .TargetGroup }}
+  become: yes
+  tasks:
+    - name: Create MinIO data directory
+      file:
+        path: "{{ .DataRoot }}/minio/data"
+        state: directory
+        mode: '0755'
+
+{{- if .RegistryMirrors }}
+    - name: Ensure /etc/docker directory exists
+      file:
+        path: /etc/docker
+        state: directory
+        mode: '0755'
+
+    - name: Configure Docker registry mirrors
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "registry-mirrors": [
+              {{- range $i, $m := .RegistryMirrors }}
+              {{- if $i }},{{ end }}
+              "{{ $m }}"
+              {{- end }}
+            ]
+          }
+      register: docker_mirror_config
+
+    - name: Restart Docker if daemon.json changed
+      systemd:
+        name: docker
+        state: restarted
+        daemon_reload: yes
+      when: docker_mirror_config.changed
+{{- end }}
+
+    - name: Create Docker bridge network if not exists
+      shell: "docker network inspect {{ .NetworkName }} || docker network create --subnet={{ .CIDR }} {{ .NetworkName }}"
+      register: network_create
+      changed_when: "'Created' in network_create.stdout"
+
+    - name: Stop and remove existing MinIO container
+      shell: "docker rm -f {{ .NamePrefix }}-minio || true"
+
+    - name: Run MinIO container
+      shell: >
+        docker run -d
+        --name {{ .NamePrefix }}-minio
+        --restart always
+        --network {{ .NetworkName }}
+        -p {{ .MinIOPort }}:9000
+        -p {{ .MinIOConsolePort }}:9001
+        -v {{ .DataRoot }}/minio/data:/data
+        -e MINIO_ROOT_USER='{{ .MinIORootUser }}'
+        -e MINIO_ROOT_PASSWORD='{{ .MinIORootPassword }}'
+        {{ .MinIOImage }}
+        server /data --console-address :9001
+`,
 }
 
 // UninstallTemplates contains built-in ansible playbooks for uninstallation and purging.
@@ -673,6 +736,22 @@ var UninstallTemplates = map[string]string{
       shell: |
         rm -rf /var/lib/docker
         rm -rf /etc/docker
+{{- end }}
+`,
+
+	"minio": `---
+- name: Uninstall MinIO Docker Service
+  hosts: {{ .TargetGroup }}
+  become: yes
+  tasks:
+    - name: Stop and remove MinIO container
+      shell: "docker rm -f {{ .NamePrefix }}-minio || true"
+
+{{- if .Purge }}
+    - name: Purge MinIO data directory
+      file:
+        path: "{{ .DataRoot }}/minio"
+        state: absent
 {{- end }}
 `,
 }
