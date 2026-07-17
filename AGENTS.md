@@ -86,6 +86,7 @@ OpsVault/
 │   ├── rocketmq/           # Docker部署RocketMQ
 │   ├── rabbitmq/           # Docker部署RabbitMQ
 │   ├── postgres/           # 预留PostgreSQL（Docker驱动）
+│   ├── minio/              # Docker部署MinIO
 │   └── ansible/            # Ansible多机编排、下发分发与回收
 │       ├── root.go         # 根入口与多环境加载 (-e test|prod)
 │       ├── ping.go         # 批量连通性测试
@@ -108,7 +109,8 @@ OpsVault/
 │   │   │   ├── redis.go
 │   │   │   ├── rocketmq.go
 │   │   │   ├── rabbitmq.go
-│   │   │   └── postgres.go
+│   │   │   ├── postgres.go
+│   │   │   └── minio.go
 │   │   └── binary/         # 二进制驱动扩展包
 │   │       ├── base.go
 │   │       ├── nginx.go    # Nginx BinaryDriver生命周期、vhost/SSL管理
@@ -227,7 +229,19 @@ opsvault postgres uninstall
 opsvault postgres upgrade
 ```
 
-## 3.8 Ansible 批量集群编排与边缘协作 (`cmd/ansible`)
+## 3.8 MinIO（Docker 驱动）
+```bash
+opsvault minio install [--pwd xxx] [--random-pwd]
+opsvault minio start
+opsvault minio stop
+opsvault minio restart
+opsvault minio uninstall [--purge]
+opsvault minio upgrade --tag RELEASE.2024-05-10T01-39-39Z
+opsvault minio status
+opsvault minio log
+```
+
+## 3.9 Ansible 批量集群编排与边缘协作 (`cmd/ansible`)
 ```bash
 # 基础连接、连通性与执行
 opsvault ansible ping --group db_servers [-e test|prod]
@@ -237,7 +251,9 @@ opsvault ansible list [-e test|prod]
 
 # 批量一键中介件编排部署与回收
 opsvault ansible deploy --service mysql --group db_servers
+opsvault ansible deploy --service minio --group db_servers
 opsvault ansible uninstall --service mysql --group db_servers [--purge]
+opsvault ansible uninstall --service minio --group db_servers [--purge]
 
 # 边缘推流初始化 (推送可执行文件与配置至 /data/opsvault/ 并创建全局软连)
 opsvault ansible push --group db_servers --bin ./bin/opsvault-linux-amd64 --config-path ./configs/default.yaml
@@ -295,7 +311,13 @@ opsvault ansible push --group db_servers --bin ./bin/opsvault-linux-amd64 --conf
 ## 4.6 PostgreSQL（预留迭代）
 *   逻辑完全对齐 MySQL Docker 驱动，端口 5432，独立宿主机数据目录，后续可扩展 BinaryDriver 二进制安装。
 
-## 4.7 Ansible 批量驱动与边缘协同模块 (`internal/driver/ansible`)
+## 4.7 MinIO 对象存储模块 (Docker)
+*   映射 API 9000 端口与 Web Console 9001 端口，启动参数固定 `--console-address :9001`。
+*   安全登录密码支持随机高强度生成并自动回写持久化。
+*   内置 `mc ready local` 用于 Docker 容器健康状况检查。
+*   支持完整的生命周期管理、镜像升级以及带 `--purge` 清除宿主机数据目录的卸载。
+
+## 4.8 Ansible 批量驱动与边缘协同模块 (`internal/driver/ansible`)
 *   **多机连通性与执行**：支持并发 SSH Ping 与 ad-hoc 执行，自动从 CLI 提取当前激活的 Cobra 参数并与 Viper 配置合并。
 *   **多机健康诊断 (doctor)**：获取并解析集群多主机 CPU、内存、根分区磁盘及 `docker`/`nginx` 服务运行状态，通过 `lipgloss` 渲染终端表格。
 *   **安全凭据生成与下发**：当 `ansible deploy` 部署 MySQL / Redis / RabbitMQ 时若未设定凭据，系统由 `credutil.GenPassword(20)` 自动生成 20 位高强度强密码，嵌入 Playbook 批量渲染下发，并在终端展示高亮卡片。
@@ -318,6 +340,7 @@ docker:
     rocketmq: "apache/rocketmq:5.3.0"
     rabbitmq: "rabbitmq:3-management"
     postgres: "postgres:15"
+    minio: "minio/minio:RELEASE.2024-05-10T01-39-39Z"
   # 容器资源限制
   resource_limit:
     cpu_max: "2"
