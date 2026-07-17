@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"OpsVault/pkg/credutil"
+	"OpsVault/pkg/fileutil"
 	"OpsVault/pkg/mysqlconf"
 
 	"github.com/docker/docker/api/types/container"
@@ -42,7 +43,11 @@ func (d *MySQLDriver) Install() error {
 		pwd := credutil.GenPassword(20)
 		d.rootPassword = pwd
 		d.Config.Set("mysql.root_password", pwd)
-		_ = d.Config.WriteConfig()
+		cfgPath := d.Config.ConfigFileUsed()
+		if cfgPath == "" {
+			cfgPath = fileutil.GetDefaultWriteConfigPath()
+		}
+		_ = fileutil.UpdateYAMLValue(cfgPath, "mysql", "root_password", pwd)
 	}
 	return d.installWithSpec(d.containerSpec)
 }

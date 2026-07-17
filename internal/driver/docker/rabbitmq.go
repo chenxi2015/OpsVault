@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"OpsVault/pkg/credutil"
+	"OpsVault/pkg/fileutil"
 	"OpsVault/pkg/rabbitmqconf"
 
 	"github.com/docker/docker/api/types/container"
@@ -54,7 +55,11 @@ func (d *RabbitMQDriver) Install() error {
 		pwd := credutil.GenPassword(20)
 		d.pass = pwd
 		d.Config.Set("rabbitmq.admin_pwd", pwd)
-		_ = d.Config.WriteConfig()
+		cfgPath := d.Config.ConfigFileUsed()
+		if cfgPath == "" {
+			cfgPath = fileutil.GetDefaultWriteConfigPath()
+		}
+		_ = fileutil.UpdateYAMLValue(cfgPath, "rabbitmq", "admin_pwd", pwd)
 	}
 	return d.installWithSpec(d.containerSpec)
 }

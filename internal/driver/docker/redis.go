@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"OpsVault/pkg/credutil"
+	"OpsVault/pkg/fileutil"
 	"OpsVault/pkg/redisconf"
 
 	"github.com/docker/docker/api/types/container"
@@ -42,7 +43,11 @@ func (d *RedisDriver) Install() error {
 		pwd := credutil.GenPassword(20)
 		d.password = pwd
 		d.Config.Set("redis.password", pwd)
-		_ = d.Config.WriteConfig()
+		cfgPath := d.Config.ConfigFileUsed()
+		if cfgPath == "" {
+			cfgPath = fileutil.GetDefaultWriteConfigPath()
+		}
+		_ = fileutil.UpdateYAMLValue(cfgPath, "redis", "password", pwd)
 	}
 	return d.installWithSpec(d.containerSpec)
 }

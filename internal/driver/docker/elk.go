@@ -469,7 +469,13 @@ func (d *ELKDriver) Upgrade(targetVersion string) error {
 	d.Config.Set("elk.elasticsearch_image", esImg)
 	d.Config.Set("elk.kibana_image", kbImg)
 	d.Config.Set("elk.logstash_image", lsImg)
-	_ = d.Config.WriteConfig()
+	cfgPath := d.Config.ConfigFileUsed()
+	if cfgPath == "" {
+		cfgPath = fileutil.GetDefaultWriteConfigPath()
+	}
+	_ = fileutil.UpdateYAMLValue(cfgPath, "elk", "elasticsearch_image", esImg)
+	_ = fileutil.UpdateYAMLValue(cfgPath, "elk", "kibana_image", kbImg)
+	_ = fileutil.UpdateYAMLValue(cfgPath, "elk", "logstash_image", lsImg)
 
 	_ = d.Stop()
 

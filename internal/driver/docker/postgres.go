@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"OpsVault/pkg/credutil"
+	"OpsVault/pkg/fileutil"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -39,7 +40,11 @@ func (d *PostgresDriver) Install() error {
 		pwd := credutil.GenPassword(20)
 		d.password = pwd
 		d.Config.Set("postgres.password", pwd)
-		_ = d.Config.WriteConfig()
+		cfgPath := d.Config.ConfigFileUsed()
+		if cfgPath == "" {
+			cfgPath = fileutil.GetDefaultWriteConfigPath()
+		}
+		_ = fileutil.UpdateYAMLValue(cfgPath, "postgres", "password", pwd)
 	}
 	return d.installWithSpec(d.containerSpec)
 }

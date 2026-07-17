@@ -66,7 +66,11 @@ func (d *NacosDriver) Install() error {
 		_, _ = rand.Read(b)
 		d.authToken = base64.StdEncoding.EncodeToString(b)
 		d.Config.Set("nacos.auth_token", d.authToken)
-		_ = d.Config.WriteConfig()
+		cfgPath := d.Config.ConfigFileUsed()
+		if cfgPath == "" {
+			cfgPath = fileutil.GetDefaultWriteConfigPath()
+		}
+		_ = fileutil.UpdateYAMLValue(cfgPath, "nacos", "auth_token", d.authToken)
 	}
 	return d.installWithSpec(d.containerSpec)
 }

@@ -10,6 +10,7 @@ import (
 
 	"OpsVault/internal/driver/ansible"
 	"OpsVault/pkg/credutil"
+	"OpsVault/pkg/fileutil"
 	"OpsVault/pkg/versionutil"
 
 	"github.com/spf13/cobra"
@@ -109,6 +110,12 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 				}
 				if vars.MySQLRootPassword == "" {
 					vars.MySQLRootPassword = generateRandomPassword()
+					v.Set("mysql.root_password", vars.MySQLRootPassword)
+					cfgPath := v.ConfigFileUsed()
+					if cfgPath == "" {
+						cfgPath = fileutil.GetDefaultWriteConfigPath()
+					}
+					_ = fileutil.UpdateYAMLValue(cfgPath, "mysql", "root_password", vars.MySQLRootPassword)
 				}
 			case "redis":
 				vars.RedisImage = v.GetString("redis.image")
@@ -122,6 +129,12 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 				}
 				if vars.RedisPassword == "" {
 					vars.RedisPassword = generateRandomPassword()
+					v.Set("redis.password", vars.RedisPassword)
+					cfgPath := v.ConfigFileUsed()
+					if cfgPath == "" {
+						cfgPath = fileutil.GetDefaultWriteConfigPath()
+					}
+					_ = fileutil.UpdateYAMLValue(cfgPath, "redis", "password", vars.RedisPassword)
 				}
 			case "rabbitmq":
 				vars.RabbitMQImage = v.GetString("rabbitmq.image")
@@ -143,6 +156,12 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 				}
 				if vars.RabbitMQPwd == "" {
 					vars.RabbitMQPwd = generateRandomPassword()
+					v.Set("rabbitmq.admin_pwd", vars.RabbitMQPwd)
+					cfgPath := v.ConfigFileUsed()
+					if cfgPath == "" {
+						cfgPath = fileutil.GetDefaultWriteConfigPath()
+					}
+					_ = fileutil.UpdateYAMLValue(cfgPath, "rabbitmq", "admin_pwd", vars.RabbitMQPwd)
 				}
 			case "nginx":
 				vars.NginxVersion = versionutil.ResolveNginxVersion(
@@ -217,6 +236,12 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 				}
 				if vars.MinIORootPassword == "" {
 					vars.MinIORootPassword = generateRandomPassword()
+					v.Set("minio.root_password", vars.MinIORootPassword)
+					cfgPath := v.ConfigFileUsed()
+					if cfgPath == "" {
+						cfgPath = fileutil.GetDefaultWriteConfigPath()
+					}
+					_ = fileutil.UpdateYAMLValue(cfgPath, "minio", "root_password", vars.MinIORootPassword)
 				}
 			case "nacos":
 				vars.NacosImage = v.GetString("nacos.image")
@@ -245,6 +270,12 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 					b := make([]byte, 32)
 					_, _ = rand.Read(b)
 					vars.NacosAuthToken = base64.StdEncoding.EncodeToString(b)
+					v.Set("nacos.auth_token", vars.NacosAuthToken)
+					cfgPath := v.ConfigFileUsed()
+					if cfgPath == "" {
+						cfgPath = fileutil.GetDefaultWriteConfigPath()
+					}
+					_ = fileutil.UpdateYAMLValue(cfgPath, "nacos", "auth_token", vars.NacosAuthToken)
 				}
 			}
 

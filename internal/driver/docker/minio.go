@@ -57,7 +57,11 @@ func (d *MinIODriver) Install() error {
 		pwd := credutil.GenPassword(20)
 		d.rootPassword = pwd
 		d.Config.Set("minio.root_password", pwd)
-		_ = d.Config.WriteConfig()
+		cfgPath := d.Config.ConfigFileUsed()
+		if cfgPath == "" {
+			cfgPath = fileutil.GetDefaultWriteConfigPath()
+		}
+		_ = fileutil.UpdateYAMLValue(cfgPath, "minio", "root_password", pwd)
 	}
 	return d.installWithSpec(d.containerSpec)
 }
