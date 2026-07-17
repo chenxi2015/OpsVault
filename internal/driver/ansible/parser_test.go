@@ -19,6 +19,7 @@ Filesystem      Size  Used Avail Use% Mounted on
 active
 inactive
 running
+running
 192.168.1.102 | UNREACHABLE | rc=0 >>
 Connection refused
 `
@@ -44,8 +45,8 @@ Connection refused
 	if h1.DiskSize != "40G" || h1.DiskUsed != "15G" || h1.DiskUsePct != "38%" {
 		t.Errorf("expected DiskSize: 40G, DiskUsed: 15G, DiskUsePct: 38%%, got %s, %s, %s", h1.DiskSize, h1.DiskUsed, h1.DiskUsePct)
 	}
-	if h1.DockerState != "active" || h1.NginxState != "inactive" || h1.MinIOState != "running" {
-		t.Errorf("expected Docker: active, Nginx: inactive, MinIO: running, got %s, %s, %s", h1.DockerState, h1.NginxState, h1.MinIOState)
+	if h1.DockerState != "active" || h1.NginxState != "inactive" || h1.MinIOState != "running" || h1.NacosState != "running" {
+		t.Errorf("expected Docker: active, Nginx: inactive, MinIO: running, Nacos: running, got %s, %s, %s, %s", h1.DockerState, h1.NginxState, h1.MinIOState, h1.NacosState)
 	}
 
 	h2 := results[1]

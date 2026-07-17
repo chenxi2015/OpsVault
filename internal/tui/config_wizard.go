@@ -93,6 +93,17 @@ var ConfigCategories = []ConfigCategory{
 		},
 	},
 	{
+		Name: "Nacos",
+		Keys: []string{
+			"nacos.image",
+			"nacos.port",
+			"nacos.grpc_port_1",
+			"nacos.grpc_port_2",
+			"nacos.auth_enable",
+			"nacos.auth_token",
+		},
+	},
+	{
 		Name: "ELK Stack",
 		Keys: []string{
 			"elk.elasticsearch_image",
@@ -159,6 +170,12 @@ var ConfigKeys = []string{
 	"minio.console_port",
 	"minio.root_user",
 	"minio.root_password",
+	"nacos.image",
+	"nacos.port",
+	"nacos.grpc_port_1",
+	"nacos.grpc_port_2",
+	"nacos.auth_enable",
+	"nacos.auth_token",
 	"elk.elasticsearch_image",
 	"elk.elasticsearch_port",
 	"elk.kibana_image",

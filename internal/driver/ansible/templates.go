@@ -627,6 +627,84 @@ var PlaybookTemplates = map[string]string{
         {{ .MinIOImage }}
         server /data --console-address :9001
 `,
+
+	"nacos": `---
+- name: Deploy Nacos via Docker
+  hosts: {{ .TargetGroup }}
+  become: yes
+  tasks:
+    - name: Create Nacos data directory
+      file:
+        path: "{{ .DataRoot }}/nacos/data"
+        state: directory
+        mode: '0755'
+
+    - name: Create Nacos logs directory
+      file:
+        path: "{{ .DataRoot }}/nacos/logs"
+        state: directory
+        mode: '0755'
+
+{{- if .RegistryMirrors }}
+    - name: Ensure /etc/docker directory exists
+      file:
+        path: /etc/docker
+        state: directory
+        mode: '0755'
+
+    - name: Configure Docker registry mirrors
+      copy:
+        content: |
+          {
+            "registry-mirrors": [
+              {{- range $i, $m := .RegistryMirrors }}
+              {{- if $i }},{{ end }}
+              "{{ $m }}"
+              {{- end }}
+            ]
+          }
+        dest: /etc/docker/daemon.json
+        mode: '0644'
+      register: docker_config
+
+    - name: Restart Docker to apply registry configuration
+      systemd:
+        name: docker
+        state: restarted
+      when: docker_config.changed
+{{- end }}
+
+    - name: Ensure Docker bridge network exists
+      shell: "docker network create --subnet={{ .CIDR }} {{ .NetworkName }} || true"
+      register: network_create
+      changed_when: "'Created' in network_create.stdout"
+
+    - name: Stop and remove existing Nacos container
+      shell: "docker rm -f {{ .NamePrefix }}-nacos || true"
+
+    - name: Run Nacos container
+      shell: >
+        docker run -d
+        --name {{ .NamePrefix }}-nacos
+        --restart always
+        --network {{ .NetworkName }}
+        -p {{ .NacosPort }}:8848
+        -p {{ .NacosGrpcPort1 }}:9848
+        -p {{ .NacosGrpcPort2 }}:9849
+        -v {{ .DataRoot }}/nacos/data:/home/nacos/data
+        -v {{ .DataRoot }}/nacos/logs:/home/nacos/logs
+        -e MODE=standalone
+        {{- if .NacosAuthEnable }}
+        -e NACOS_AUTH_ENABLE=true
+        -e NACOS_AUTH_TOKEN='{{ .NacosAuthToken }}'
+        -e NACOS_AUTH_TOKEN_SECRET='{{ .NacosAuthToken }}'
+        -e NACOS_AUTH_IDENTITY_KEY='opsvault_key'
+        -e NACOS_AUTH_IDENTITY_VALUE='opsvault_value'
+        {{- else }}
+        -e NACOS_AUTH_ENABLE=false
+        {{- end }}
+        {{ .NacosImage }}
+`,
 }
 
 // UninstallTemplates contains built-in ansible playbooks for uninstallation and purging.
@@ -756,6 +834,22 @@ var UninstallTemplates = map[string]string{
     - name: Purge MinIO data directory
       file:
         path: "{{ .DataRoot }}/minio"
+        state: absent
+{{- end }}
+`,
+
+	"nacos": `---
+- name: Uninstall Nacos Docker Service
+  hosts: {{ .TargetGroup }}
+  become: yes
+  tasks:
+    - name: Stop and remove Nacos container
+      shell: "docker rm -f {{ .NamePrefix }}-nacos || true"
+
+{{- if .Purge }}
+    - name: Purge Nacos data directory
+      file:
+        path: "{{ .DataRoot }}/nacos"
         state: absent
 {{- end }}
 `,

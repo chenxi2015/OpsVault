@@ -34,7 +34,7 @@ func newBakCommand(cfg *viper.Viper) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bak",
 		Short: "Manage configuration backups",
-		Long:  "Backup and restore configuration files for Nginx, MySQL, Redis, RocketMQ, RabbitMQ, PostgreSQL and global default.yaml",
+		Long:  "Backup and restore configuration files for Nginx, MySQL, Redis, RocketMQ, RabbitMQ, PostgreSQL, Nacos and global default.yaml",
 	}
 
 	cmd.AddCommand(
@@ -54,7 +54,7 @@ func newBakCreateCommand(cfg *viper.Viper) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create [service]",
 		Short: "Create a configuration backup",
-		Long:  "Create a backup of service configuration files. You can specify a single service (nginx, mysql, redis, etc.) or omit/use 'all' to back up all configurations.",
+		Long:  "Create a backup of service configuration files. You can specify a single service (nginx, mysql, redis, nacos, etc.) or omit/use 'all' to back up all configurations.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			manager := backup.NewBackupManager(cfg)
 

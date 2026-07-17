@@ -32,6 +32,7 @@ func (p RuntimeStatusProvider) Services() []ServiceRef {
 		{Name: "jenkins", Driver: dockdrv.NewJenkinsDriver(dockdrv.WrapClient(cli), p.config)},
 		{Name: "gitlab", Driver: dockdrv.NewGitLabDriver(dockdrv.WrapClient(cli), p.config)},
 		{Name: "minio", Driver: dockdrv.NewMinIODriver(dockdrv.WrapClient(cli), p.config, "")},
+		{Name: "nacos", Driver: dockdrv.NewNacosDriver(dockdrv.WrapClient(cli), p.config, "")},
 	}
 }
 

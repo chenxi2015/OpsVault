@@ -50,6 +50,9 @@ func runAction(cfg *viper.Viper, dockerCli *client.Client, service ServiceRef, a
 			case "postgres":
 				pwd := params["pwd"]
 				drv = dockdrv.NewPostgresDriver(dockdrv.WrapClient(dockerCli), cfg, pwd)
+			case "nacos":
+				token := params["token"]
+				drv = dockdrv.NewNacosDriver(dockdrv.WrapClient(dockerCli), cfg, token)
 			}
 		}
 
@@ -86,6 +89,8 @@ func runAction(cfg *viper.Viper, dockerCli *client.Client, service ServiceRef, a
 					targetVersion = "5.3.0"
 				case "rabbitmq":
 					targetVersion = "3.13-management"
+				case "nacos":
+					targetVersion = "v2.3.2"
 				default:
 					targetVersion = "latest"
 				}

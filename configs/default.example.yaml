@@ -108,3 +108,11 @@ minio:
   console_port: 9001                              # MinIO Console port mapped to the host
   root_user: "minioadmin"                         # MinIO root access key / username
   root_password: ""                               # MinIO root secret key / password (auto-generated if empty)
+nacos:
+  image: "nacos/nacos-server:v2.3.2"              # Nacos Docker image tag
+  port: 8848                                      # Nacos Web Console/API port mapped to the host
+  grpc_port_1: 9848                               # gRPC client port (usually port + 1000)
+  grpc_port_2: 9849                               # gRPC member port (usually port + 1001)
+  auth_enable: true                               # Whether to enable Nacos console authentication
+  auth_token: ""                                  # Nacos token secret (min 32 chars base64, auto-generated if empty)
+

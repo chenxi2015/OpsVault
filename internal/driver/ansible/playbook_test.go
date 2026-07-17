@@ -44,9 +44,15 @@ func TestGeneratePlaybookFile(t *testing.T) {
 		MinIOConsolePort:     9001,
 		MinIORootUser:        "minioadmin",
 		MinIORootPassword:    "miniopass",
+		NacosImage:           "nacos/nacos-server:v2.3.2",
+		NacosPort:            8848,
+		NacosGrpcPort1:       9848,
+		NacosGrpcPort2:       9849,
+		NacosAuthEnable:      true,
+		NacosAuthToken:       "VGhpc0lzTXlDdXN0b21TZWNyZXRLZXkwMTIzNDU2Nzg=",
 	}
 
-	services := []string{"docker", "mysql", "redis", "rabbitmq", "nginx", "minio"}
+	services := []string{"docker", "mysql", "redis", "rabbitmq", "nginx", "minio", "nacos"}
 	for _, svc := range services {
 		t.Run(svc, func(t *testing.T) {
 			playbookPath, err := GeneratePlaybookFile(tempDir, svc, vars)
@@ -86,6 +92,13 @@ func TestGeneratePlaybookFile(t *testing.T) {
 				}
 				if !strings.Contains(content, "--console-address :9001") {
 					t.Errorf("expected minio console address to be rendered")
+				}
+			} else if svc == "nacos" {
+				if !strings.Contains(content, "NACOS_AUTH_TOKEN='VGhpc0lzTXlDdXN0b21TZWNyZXRLZXkwMTIzNDU2Nzg='") {
+					t.Errorf("expected nacos auth token to be rendered")
+				}
+				if !strings.Contains(content, "NACOS_AUTH_ENABLE=true") {
+					t.Errorf("expected nacos auth enable to be rendered")
 				}
 			}
 		})
@@ -175,6 +188,28 @@ func TestGenerateUninstallPlaybookFile(t *testing.T) {
 
 		if !strings.Contains(content, "docker rm -f opsvault-minio") {
 			t.Errorf("expected minio container remove task in playbook")
+		}
+	})
+
+	t.Run("nacos", func(t *testing.T) {
+		playbookPath, err := GenerateUninstallPlaybookFile(tempDir, "nacos", vars)
+		if err != nil {
+			t.Fatalf("failed to generate uninstall playbook for nacos: %v", err)
+		}
+
+		contentBytes, err := os.ReadFile(playbookPath)
+		if err != nil {
+			t.Fatalf("failed to read generated uninstall playbook: %v", err)
+		}
+		content := string(contentBytes)
+
+		var parsed []map[string]interface{}
+		if err := yaml.Unmarshal(contentBytes, &parsed); err != nil {
+			t.Errorf("generated uninstall playbook is not valid YAML: %v\nContent:\n%s", err, content)
+		}
+
+		if !strings.Contains(content, "docker rm -f opsvault-nacos") {
+			t.Errorf("expected nacos container remove task in playbook")
 		}
 	})
 }

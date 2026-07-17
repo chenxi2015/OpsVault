@@ -42,7 +42,7 @@ func (c *commandSet) newDoctorCommand() *cobra.Command {
 			fmt.Printf("Inspecting remote hosts in group: %s...\n", group)
 
 			// Combine multiple inspection commands to parse
-			inspectionCmd := `echo "===UPTIME==="; uptime; echo "===FREE==="; free -m; echo "===DF==="; df -h /; echo "===SERVICES==="; systemctl is-active docker || echo "inactive"; systemctl is-active nginx || echo "inactive"; if docker inspect opsvault-minio >/dev/null 2>&1; then docker inspect opsvault-minio | grep '"Status":' | cut -d'"' -f4; else echo "inactive"; fi`
+			inspectionCmd := `echo "===UPTIME==="; uptime; echo "===FREE==="; free -m; echo "===DF==="; df -h /; echo "===SERVICES==="; systemctl is-active docker || echo "inactive"; systemctl is-active nginx || echo "inactive"; if docker inspect opsvault-minio >/dev/null 2>&1; then docker inspect opsvault-minio | grep '"Status":' | cut -d'"' -f4; else echo "inactive"; fi; if docker inspect opsvault-nacos >/dev/null 2>&1; then docker inspect opsvault-nacos | grep '"Status":' | cut -d'"' -f4; else echo "inactive"; fi`
 
 			var stdoutBuf bytes.Buffer
 			var stderrBuf bytes.Buffer
@@ -68,8 +68,9 @@ func (c *commandSet) newDoctorCommand() *cobra.Command {
 			dockerHeader := headerStyle.Width(10).Render("DOCKER")
 			nginxHeader := headerStyle.Width(10).Render("NGINX")
 			minioHeader := headerStyle.Width(10).Render("MINIO")
+			nacosHeader := headerStyle.Width(10).Render("NACOS")
 
-			cmd.Println("\n" + lipgloss.JoinHorizontal(lipgloss.Top, ipHeader, statusHeader, uptimeHeader, memHeader, diskHeader, dockerHeader, nginxHeader, minioHeader))
+			cmd.Println("\n" + lipgloss.JoinHorizontal(lipgloss.Top, ipHeader, statusHeader, uptimeHeader, memHeader, diskHeader, dockerHeader, nginxHeader, minioHeader, nacosHeader))
 
 			// Render Rows
 			for _, r := range results {
@@ -132,7 +133,17 @@ func (c *commandSet) newDoctorCommand() *cobra.Command {
 				}
 				minioRow := rowStyle.Width(10).Render(minioVal)
 
-				cmd.Println(lipgloss.JoinHorizontal(lipgloss.Top, ipRow, statusRow, uptimeRow, memRow, diskRow, dockerRow, nginxRow, minioRow))
+				var nacosVal string
+				if strings.Contains(r.NacosState, "running") {
+					nacosVal = successText.Render("running")
+				} else if r.NacosState != "" && r.NacosState != "inactive" {
+					nacosVal = warnText.Render(r.NacosState)
+				} else {
+					nacosVal = warnText.Render("inactive")
+				}
+				nacosRow := rowStyle.Width(10).Render(nacosVal)
+
+				cmd.Println(lipgloss.JoinHorizontal(lipgloss.Top, ipRow, statusRow, uptimeRow, memRow, diskRow, dockerRow, nginxRow, minioRow, nacosRow))
 			}
 			cmd.Println()
 

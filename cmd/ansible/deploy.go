@@ -1,6 +1,8 @@
 package ansiblecmd
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -27,10 +29,10 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 
 			// Validate service support
 			switch service {
-			case "docker", "mysql", "redis", "rabbitmq", "nginx", "minio":
+			case "docker", "mysql", "redis", "rabbitmq", "nginx", "minio", "nacos":
 				// valid
 			default:
-				return fmt.Errorf("unsupported service: %s. Supported: docker, mysql, redis, rabbitmq, nginx, minio", service)
+				return fmt.Errorf("unsupported service: %s. Supported: docker, mysql, redis, rabbitmq, nginx, minio, nacos", service)
 			}
 
 			exec, cleanup, err := c.getExecutor()
@@ -216,6 +218,34 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 				if vars.MinIORootPassword == "" {
 					vars.MinIORootPassword = generateRandomPassword()
 				}
+			case "nacos":
+				vars.NacosImage = v.GetString("nacos.image")
+				vars.NacosPort = v.GetInt("nacos.port")
+				vars.NacosGrpcPort1 = v.GetInt("nacos.grpc_port_1")
+				vars.NacosGrpcPort2 = v.GetInt("nacos.grpc_port_2")
+				vars.NacosAuthEnable = true
+				if v.IsSet("nacos.auth_enable") {
+					vars.NacosAuthEnable = v.GetBool("nacos.auth_enable")
+				}
+				vars.NacosAuthToken = v.GetString("nacos.auth_token")
+
+				if vars.NacosImage == "" {
+					vars.NacosImage = "nacos/nacos-server:v2.3.2"
+				}
+				if vars.NacosPort == 0 {
+					vars.NacosPort = 8848
+				}
+				if vars.NacosGrpcPort1 == 0 {
+					vars.NacosGrpcPort1 = 9848
+				}
+				if vars.NacosGrpcPort2 == 0 {
+					vars.NacosGrpcPort2 = 9849
+				}
+				if vars.NacosAuthToken == "" && vars.NacosAuthEnable {
+					b := make([]byte, 32)
+					_, _ = rand.Read(b)
+					vars.NacosAuthToken = base64.StdEncoding.EncodeToString(b)
+				}
 			}
 
 			tempDir := v.GetString("ansible.temp_dir")
@@ -275,6 +305,23 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 					{Label: "用户名", Value: vars.MinIORootUser},
 					{Label: "密  码", Value: vars.MinIORootPassword},
 				}
+			case "nacos":
+				authVal := "Enabled"
+				if !vars.NacosAuthEnable {
+					authVal = "Disabled"
+				}
+				creds = []credutil.Credential{
+					{Label: "目标分组", Value: group},
+					{Label: "控制台端口", Value: fmt.Sprintf("%d", vars.NacosPort)},
+					{Label: "认证状态", Value: authVal},
+				}
+				if vars.NacosAuthEnable {
+					creds = append(creds,
+						credutil.Credential{Label: "默认用户名", Value: "nacos"},
+						credutil.Credential{Label: "默认密码", Value: "nacos (可在控制台修改)"},
+						credutil.Credential{Label: "Token Secret", Value: vars.NacosAuthToken},
+					)
+				}
 			}
 			if len(creds) > 0 {
 				credutil.PrintCredentials(strings.ToUpper(service), creds)
@@ -283,7 +330,7 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&service, "service", "s", "", "middleware service to deploy (docker, mysql, redis, rabbitmq, nginx, minio)")
+	cmd.Flags().StringVarP(&service, "service", "s", "", "middleware service to deploy (docker, mysql, redis, rabbitmq, nginx, minio, nacos)")
 	cmd.Flags().StringVarP(&group, "group", "g", "all", "target host group for deployment")
 	_ = cmd.MarkFlagRequired("service")
 

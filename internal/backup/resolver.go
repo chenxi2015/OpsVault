@@ -34,6 +34,7 @@ func (m *BackupManager) ResolveConfigPaths() map[string]string {
 		"rabbitmq":    filepath.Join(dataRoot, "rabbitmq", "conf"),
 		"postgres":    filepath.Join(dataRoot, "postgres", "conf"),
 		"elk":         filepath.Join(dataRoot, "elk", "conf"),
+		"nacos":       filepath.Join(dataRoot, "nacos", "conf"),
 		"system_root": dataRoot,
 	}
 

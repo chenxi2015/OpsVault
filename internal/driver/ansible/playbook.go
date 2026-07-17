@@ -44,6 +44,12 @@ type PlaybookVars struct {
 	MinIOConsolePort  int
 	MinIORootUser     string
 	MinIORootPassword string
+	NacosImage        string
+	NacosPort         int
+	NacosGrpcPort1    int
+	NacosGrpcPort2    int
+	NacosAuthEnable   bool
+	NacosAuthToken    string
 	// Nginx binary driver fields
 	NginxVersion         string
 	NginxPCREVersion     string

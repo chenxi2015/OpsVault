@@ -281,6 +281,9 @@ func checkPorts(config *viper.Viper) DiagnosticItem {
 		{Service: "Logstash Beats 输入", ConfigKey: "elk.logstash_port", Default: 5044},
 		{Service: "MinIO API", ConfigKey: "minio.port", Default: 9000},
 		{Service: "MinIO Console", ConfigKey: "minio.console_port", Default: 9001},
+		{Service: "Nacos 控制台", ConfigKey: "nacos.port", Default: 8848},
+		{Service: "Nacos gRPC 客户端", ConfigKey: "nacos.grpc_port_1", Default: 9848},
+		{Service: "Nacos gRPC 集群", ConfigKey: "nacos.grpc_port_2", Default: 9849},
 	}
 
 	type Row struct {

@@ -13,12 +13,14 @@ import (
 	"OpsVault/cmd/jenkins"
 	"OpsVault/cmd/minio"
 	"OpsVault/cmd/mysql"
+	"OpsVault/cmd/nacos"
 	"OpsVault/cmd/nginx"
 	"OpsVault/cmd/postgres"
 	"OpsVault/cmd/rabbitmq"
 	"OpsVault/cmd/redis"
 	"OpsVault/cmd/rocketmq"
 	"OpsVault/internal/driver"
+
 	"OpsVault/pkg/dockercli"
 	"OpsVault/pkg/fileutil"
 	"OpsVault/pkg/logger"
@@ -100,6 +102,7 @@ func init() {
 	rootCmd.AddCommand(jenkins.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(gitlab.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(minio.NewCommand(config, dockerFactory))
+	rootCmd.AddCommand(nacos.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(newBakCommand(config))
 	rootCmd.AddCommand(newMigrateCommand(config))
 	rootCmd.AddCommand(ansiblecmd.NewCommand(config))
@@ -210,6 +213,12 @@ func applyDefaultConfig(v *viper.Viper) {
 	v.SetDefault("minio.console_port", 9001)
 	v.SetDefault("minio.root_user", "minioadmin")
 	v.SetDefault("minio.root_password", "")
+	v.SetDefault("nacos.image", "nacos/nacos-server:v2.3.2")
+	v.SetDefault("nacos.port", 8848)
+	v.SetDefault("nacos.grpc_port_1", 9848)
+	v.SetDefault("nacos.grpc_port_2", 9849)
+	v.SetDefault("nacos.auth_enable", true)
+	v.SetDefault("nacos.auth_token", "")
 	v.SetDefault("log.level", "info")
 
 	v.SetDefault("log.storage_path", "")
