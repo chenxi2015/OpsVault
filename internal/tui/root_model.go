@@ -94,6 +94,10 @@ type RootModel struct {
 	selectedCertIndex    int
 	nginxVHosts          []map[string]string
 
+	// Config specific states
+	selectedConfigCategory int
+	selectedConfigItem     int
+
 	// Confirmation flow
 	confirming      bool
 	confirmPrompt   string
@@ -419,6 +423,8 @@ func (m *RootModel) resetSubNavigation() {
 	m.selectedNginxSubMode = 0
 	m.selectedVHostIndex = 0
 	m.selectedCertIndex = 0
+	m.selectedConfigCategory = 0
+	m.selectedConfigItem = 0
 	m.confirming = false
 	m.editing = false
 }
@@ -510,13 +516,28 @@ func (m *RootModel) handleShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.active == 4 {
-		if msg.String() == "enter" && m.selectedServiceIndex < len(ConfigKeys) {
-			configKey := ConfigKeys[m.selectedServiceIndex]
-			m.editing = true
-			m.textInputPrompt = fmt.Sprintf("Enter new value for %s:", configKey)
-			m.textInputState = "config|" + configKey
-			m.textInputValue = m.config.GetString(configKey)
-			return m, nil
+		if msg.String() == "enter" {
+			if m.focus == focusSidebar {
+				m.focus = focusDetail
+				m.selectedConfigItem = 0
+				return m, nil
+			} else if m.focus == focusDetail {
+				cat := ConfigCategories[m.selectedConfigCategory]
+				if m.selectedConfigItem < len(cat.Keys) {
+					configKey := cat.Keys[m.selectedConfigItem]
+					m.editing = true
+					m.textInputPrompt = fmt.Sprintf("Enter new value for %s:", configKey)
+					m.textInputState = "config|" + configKey
+					m.textInputValue = m.config.GetString(configKey)
+					return m, nil
+				}
+			}
+		}
+		if msg.String() == "esc" {
+			if m.focus == focusDetail {
+				m.focus = focusSidebar
+				return m, nil
+			}
 		}
 		if msg.String() == "s" {
 			m.drawerMode = drawerTasks
@@ -815,13 +836,14 @@ func (m *RootModel) moveSelection(dir int) {
 				m.selectedNginxSubMode = 0
 			}
 		case 4:
-			listLen := len(ConfigKeys)
-			m.selectedServiceIndex += dir
-			if m.selectedServiceIndex < 0 {
-				m.selectedServiceIndex = listLen - 1
-			} else if m.selectedServiceIndex >= listLen {
-				m.selectedServiceIndex = 0
+			listLen := len(ConfigCategories)
+			m.selectedConfigCategory += dir
+			if m.selectedConfigCategory < 0 {
+				m.selectedConfigCategory = listLen - 1
+			} else if m.selectedConfigCategory >= listLen {
+				m.selectedConfigCategory = 0
 			}
+			m.selectedConfigItem = 0
 		}
 	case focusDetail:
 		if m.active == 1 {
@@ -839,6 +861,15 @@ func (m *RootModel) moveSelection(dir int) {
 				} else if m.selectedCertIndex >= len(m.nginxVHosts) {
 					m.selectedCertIndex = 0
 				}
+			}
+		} else if m.active == 4 {
+			cat := ConfigCategories[m.selectedConfigCategory]
+			listLen := len(cat.Keys)
+			m.selectedConfigItem += dir
+			if m.selectedConfigItem < 0 {
+				m.selectedConfigItem = listLen - 1
+			} else if m.selectedConfigItem >= listLen {
+				m.selectedConfigItem = 0
 			}
 		}
 	}

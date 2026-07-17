@@ -139,3 +139,40 @@ func TestRootModelFocusAndDrawer(t *testing.T) {
 		t.Errorf("expected initial drawer to be drawerHidden, got %v", root.drawerMode)
 	}
 }
+
+func TestRootModelConfigTab(t *testing.T) {
+	model := NewRootModel(StaticStatusProvider{})
+	model.active = 4 // Config Tab
+	model.focus = focusSidebar
+
+	// Verify Category selection moves down
+	updated, _ := (&model).Update(tea.KeyMsg{Type: tea.KeyDown, Runes: []rune{}})
+	root := updated.(*RootModel)
+	if root.selectedConfigCategory != 1 {
+		t.Errorf("expected selectedConfigCategory to be 1, got %d", root.selectedConfigCategory)
+	}
+
+	// Verify Enter moves focus to details
+	updated, _ = root.Update(tea.KeyMsg{Type: tea.KeyEnter, Runes: []rune{}})
+	root = updated.(*RootModel)
+	if root.focus != focusDetail {
+		t.Errorf("expected enter on sidebar to change focus to focusDetail, got %v", root.focus)
+	}
+	if root.selectedConfigItem != 0 {
+		t.Errorf("expected selectedConfigItem to be reset to 0, got %d", root.selectedConfigItem)
+	}
+
+	// Verify Item selection moves down
+	updated, _ = root.Update(tea.KeyMsg{Type: tea.KeyDown, Runes: []rune{}})
+	root = updated.(*RootModel)
+	if root.selectedConfigItem != 1 {
+		t.Errorf("expected selectedConfigItem to be 1, got %d", root.selectedConfigItem)
+	}
+
+	// Verify Esc moves focus back to sidebar
+	updated, _ = root.Update(tea.KeyMsg{Type: tea.KeyEsc, Runes: []rune{}})
+	root = updated.(*RootModel)
+	if root.focus != focusSidebar {
+		t.Errorf("expected Esc on details to change focus back to focusSidebar, got %v", root.focus)
+	}
+}

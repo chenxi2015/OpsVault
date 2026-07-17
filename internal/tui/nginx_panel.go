@@ -112,7 +112,30 @@ func NginxPanelView(m RootModel) string {
 		if len(m.nginxVHosts) == 0 {
 			detailLines = append(detailLines, "No Virtual Hosts configured.", "")
 		} else {
-			for idx, vh := range m.nginxVHosts {
+			maxVisible := 6
+			start := 0
+			if m.selectedVHostIndex >= maxVisible/2 {
+				start = m.selectedVHostIndex - maxVisible/2
+			}
+			if start+maxVisible > len(m.nginxVHosts) {
+				start = len(m.nginxVHosts) - maxVisible
+			}
+			if start < 0 {
+				start = 0
+			}
+			end := start + maxVisible
+			if end > len(m.nginxVHosts) {
+				end = len(m.nginxVHosts)
+			}
+
+			if start > 0 {
+				detailLines = append(detailLines, lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("  ▲ ..."))
+			} else {
+				detailLines = append(detailLines, "")
+			}
+
+			for idx := start; idx < end; idx++ {
+				vh := m.nginxVHosts[idx]
 				domain := strings.TrimSuffix(vh["domain"], ".conf")
 				prefix := "  "
 				rowStyle := lipgloss.NewStyle()
@@ -127,6 +150,12 @@ func NginxPanelView(m RootModel) string {
 					selectedPath = vh["path"]
 				}
 				detailLines = append(detailLines, prefix+rowStyle.Render(domain))
+			}
+
+			if end < len(m.nginxVHosts) {
+				detailLines = append(detailLines, lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("  ▼ ..."))
+			} else {
+				detailLines = append(detailLines, "")
 			}
 			detailLines = append(detailLines, "")
 		}
@@ -167,7 +196,30 @@ func NginxPanelView(m RootModel) string {
 			}
 
 			var selectedCertPath string
-			for idx, vh := range m.nginxVHosts {
+			maxVisible := 6
+			start := 0
+			if m.selectedCertIndex >= maxVisible/2 {
+				start = m.selectedCertIndex - maxVisible/2
+			}
+			if start+maxVisible > len(m.nginxVHosts) {
+				start = len(m.nginxVHosts) - maxVisible
+			}
+			if start < 0 {
+				start = 0
+			}
+			end := start + maxVisible
+			if end > len(m.nginxVHosts) {
+				end = len(m.nginxVHosts)
+			}
+
+			if start > 0 {
+				detailLines = append(detailLines, lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("  ▲ ..."))
+			} else {
+				detailLines = append(detailLines, "")
+			}
+
+			for idx := start; idx < end; idx++ {
+				vh := m.nginxVHosts[idx]
 				domain := strings.TrimSuffix(vh["domain"], ".conf")
 				certPath := filepath.Join(sslRoot, domain, "fullchain.pem")
 
@@ -192,6 +244,12 @@ func NginxPanelView(m RootModel) string {
 					}
 				}
 				detailLines = append(detailLines, fmt.Sprintf("%s%s (%s)", prefix, rowStyle.Render(domain), sslStyle.Render(sslStatus)))
+			}
+
+			if end < len(m.nginxVHosts) {
+				detailLines = append(detailLines, lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("  ▼ ..."))
+			} else {
+				detailLines = append(detailLines, "")
 			}
 			detailLines = append(detailLines, "")
 
@@ -238,7 +296,7 @@ func NginxPanelView(m RootModel) string {
 		BorderForeground(lipgloss.Color(sidebarBorderColor)).
 		Padding(1, 2).
 		Width(26).
-		Height(12).
+		Height(19).
 		Render(strings.Join(sidebarLines, "\n"))
 
 	detailBox := lipgloss.NewStyle().
@@ -246,7 +304,7 @@ func NginxPanelView(m RootModel) string {
 		BorderForeground(lipgloss.Color(detailBorderColor)).
 		Padding(1, 2).
 		Width(48).
-		Height(12).
+		Height(19).
 		Render(strings.Join(detailLines, "\n"))
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, sidebarBox, "  ", detailBox)

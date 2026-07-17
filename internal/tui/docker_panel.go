@@ -35,7 +35,32 @@ func DockerPanelView(m RootModel) string {
 		lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("---------------"),
 	}
 
-	for idx, ref := range dockerServices {
+	// Sliding window for dockerServices
+	maxVisible := 14
+	start := 0
+	if m.selectedServiceIndex >= maxVisible/2 {
+		start = m.selectedServiceIndex - maxVisible/2
+	}
+	if start+maxVisible > len(dockerServices) {
+		start = len(dockerServices) - maxVisible
+	}
+	if start < 0 {
+		start = 0
+	}
+	end := start + maxVisible
+	if end > len(dockerServices) {
+		end = len(dockerServices)
+	}
+
+	// Render up-scroll indicator
+	if start > 0 {
+		sidebarLines = append(sidebarLines, lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("  ▲ ..."))
+	} else {
+		sidebarLines = append(sidebarLines, "")
+	}
+
+	for idx := start; idx < end; idx++ {
+		ref := dockerServices[idx]
 		status := m.findService(ref.Name)
 		runningState := "down"
 		if status != nil && status.Running {
@@ -60,6 +85,13 @@ func DockerPanelView(m RootModel) string {
 		} else {
 			sidebarLines = append(sidebarLines, "  "+line)
 		}
+	}
+
+	// Render down-scroll indicator
+	if end < len(dockerServices) {
+		sidebarLines = append(sidebarLines, lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("  ▼ ..."))
+	} else {
+		sidebarLines = append(sidebarLines, "")
 	}
 
 	// 2. Render Right Detail Panel
@@ -155,7 +187,7 @@ func DockerPanelView(m RootModel) string {
 		BorderForeground(lipgloss.Color("240")).
 		Padding(1, 2).
 		Width(32).
-		Height(12).
+		Height(19).
 		Render(strings.Join(sidebarLines, "\n"))
 
 	detailBox := lipgloss.NewStyle().
@@ -163,7 +195,7 @@ func DockerPanelView(m RootModel) string {
 		BorderForeground(lipgloss.Color("240")).
 		Padding(1, 2).
 		Width(48).
-		Height(12).
+		Height(19).
 		Render(strings.Join(detailLines, "\n"))
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, sidebarBox, "  ", detailBox)
