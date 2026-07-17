@@ -185,6 +185,18 @@ func (d *BaseDriver) ensureRegistryMirrors() error {
 	if err != nil {
 		return err
 	}
+	// Backup existing daemon.json before modifying
+	if _, err := os.Stat(daemonConfPath); err == nil {
+		backupPath := fmt.Sprintf("%s.%s.bak", daemonConfPath, time.Now().Format("20060102150405"))
+		if oldData, err := os.ReadFile(daemonConfPath); err == nil {
+			if err := os.WriteFile(backupPath, oldData, 0o600); err == nil {
+				logger.Infof("Backed up existing %s to %s", daemonConfPath, backupPath)
+			} else {
+				logger.Errorf("Failed to backup existing %s to %s: %v", daemonConfPath, backupPath, err)
+			}
+		}
+	}
+
 	if err := os.WriteFile(daemonConfPath, outData, 0o644); err != nil {
 		return err
 	}

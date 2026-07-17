@@ -72,6 +72,7 @@ var PlaybookTemplates = map[string]string{
     - name: Configure Docker registry mirrors
       copy:
         dest: /etc/docker/daemon.json
+        backup: yes
         content: |
           {
             "registry-mirrors": [
@@ -129,6 +130,7 @@ var PlaybookTemplates = map[string]string{
     - name: Configure Docker registry mirrors
       copy:
         dest: /etc/docker/daemon.json
+        backup: yes
         content: |
           {
             "registry-mirrors": [
@@ -200,6 +202,7 @@ var PlaybookTemplates = map[string]string{
     - name: Configure Docker registry mirrors
       copy:
         dest: /etc/docker/daemon.json
+        backup: yes
         content: |
           {
             "registry-mirrors": [
@@ -271,6 +274,7 @@ var PlaybookTemplates = map[string]string{
     - name: Configure Docker registry mirrors
       copy:
         dest: /etc/docker/daemon.json
+        backup: yes
         content: |
           {
             "registry-mirrors": [
@@ -581,6 +585,7 @@ var PlaybookTemplates = map[string]string{
     - name: Configure Docker registry mirrors
       copy:
         dest: /etc/docker/daemon.json
+        backup: yes
         content: |
           {
             "registry-mirrors": [
