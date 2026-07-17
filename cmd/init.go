@@ -74,6 +74,7 @@ func newInitModel() *initModel {
 			{name: "elk", selected: false},
 			{name: "jenkins", selected: false},
 			{name: "gitlab", selected: false},
+			{name: "minio", selected: false},
 		},
 	}
 }
