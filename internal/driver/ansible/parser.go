@@ -18,6 +18,7 @@ type HostStatus struct {
 	DiskUsePct  string
 	DockerState string
 	NginxState  string
+	MinIOState  string
 	RawOutput   string
 }
 
@@ -128,11 +129,13 @@ func parseHostMetrics(h *HostStatus) {
 				}
 			}
 		case "services":
-			// First line of services is docker, second is nginx
+			// First line of services is docker, second is nginx, third is minio
 			if h.DockerState == "" {
 				h.DockerState = line
 			} else if h.NginxState == "" {
 				h.NginxState = line
+			} else if h.MinIOState == "" {
+				h.MinIOState = line
 			}
 		}
 	}
