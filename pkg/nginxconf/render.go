@@ -3,7 +3,10 @@
 // All config content is generated here to guarantee consistency.
 package nginxconf
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Config holds the parameters needed to render all Nginx config files.
 // Both the binary driver (local install) and the Ansible playbook generator
@@ -21,143 +24,79 @@ type Config struct {
 
 // RenderBaseConfig returns the content for nginx.conf (main config file).
 func RenderBaseConfig(c Config) string {
-	return fmt.Sprintf(`user %s %s;
-worker_processes auto;
-
-error_log %s/error_nginx.log crit;
-pid /var/run/nginx.pid;
-worker_rlimit_nofile 51200;
-
-events {
-  use epoll;
-  worker_connections 51200;
-  multi_accept on;
-}
-
-http {
-  include mime.types;
-  default_type application/octet-stream;
-  server_names_hash_bucket_size 128;
-  client_header_buffer_size 32k;
-  large_client_header_buffers 4 32k;
-  client_max_body_size 1024m;
-  client_body_buffer_size 10m;
-  sendfile on;
-  tcp_nopush on;
-  keepalive_timeout 120;
-  server_tokens off;
-  tcp_nodelay on;
-
-  gzip on;
-  gzip_buffers 16 8k;
-  gzip_comp_level 6;
-  gzip_http_version 1.1;
-  gzip_min_length 256;
-  gzip_proxied any;
-  gzip_vary on;
-  gzip_types text/xml application/xml application/atom+xml application/rss+xml application/xhtml+xml image/svg+xml text/javascript application/javascript application/x-javascript text/x-json application/json text/css text/plain image/x-icon;
-  gzip_disable "MSIE [1-6]\.(?!.*SV1)";
-
-  log_format json escape=json '{"@timestamp":"$time_iso8601","server_addr":"$server_addr","remote_addr":"$remote_addr","scheme":"$scheme","request_method":"$request_method","request_uri":"$request_uri","request_time":$request_time,"body_bytes_sent":$body_bytes_sent,"status":"$status","host":"$host","http_referer":"$http_referer","http_user_agent":"$http_user_agent"}';
-
-  server {
-    listen 80;
-    server_name _;
-    access_log %s/access_nginx.log combined;
-    root %s/default;
-    index index.html index.htm;
-
-    location /nginx_status {
-      stub_status on;
-      access_log off;
-      allow 127.0.0.1;
-      deny all;
-    }
-
-    location ~ .*\.(gif|jpg|jpeg|png|bmp|swf|flv|mp4|ico)$ {
-      expires 30d;
-      access_log off;
-    }
-
-    location ~ .*\.(js|css)?$ {
-      expires 7d;
-      access_log off;
-    }
-
-    location ~ ^/(\.user.ini|\.ht|\.git|\.svn|\.project|LICENSE|README.md) {
-      deny all;
-    }
-
-    location /.well-known {
-      allow all;
-    }
-  }
-
-  include vhost/*.conf;
-}
-`, c.RunUser, c.RunGroup, c.WWWLogsRoot, c.WWWLogsRoot, c.WWWRoot)
+	return fmt.Sprintf(baseConfigTemplate, c.RunUser, c.RunGroup, c.WWWLogsRoot, c.WWWLogsRoot, c.WWWRoot)
 }
 
 // RenderProxyConfig returns the content for proxy.conf (shared proxy settings).
 func RenderProxyConfig() string {
-	return `proxy_connect_timeout 300s;
-proxy_send_timeout 900;
-proxy_read_timeout 900;
-proxy_buffer_size 32k;
-proxy_buffers 4 64k;
-proxy_busy_buffers_size 128k;
-proxy_redirect off;
-proxy_hide_header Vary;
-proxy_set_header Accept-Encoding '';
-proxy_set_header Referer $http_referer;
-proxy_set_header Cookie $http_cookie;
-proxy_set_header Host $host;
-proxy_set_header X-Real-IP $remote_addr;
-proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-proxy_set_header X-Forwarded-Proto $scheme;
-`
+	return proxyConfigTemplate
 }
 
 // RenderSystemdUnit returns the content for the nginx systemd service unit file.
 func RenderSystemdUnit(c Config) string {
 	nginxBin := c.InstallPath + "/sbin/nginx"
 	nginxConf := c.InstallPath + "/conf/nginx.conf"
-	return fmt.Sprintf(`[Unit]
-Description=nginx - high performance web server
-Documentation=http://nginx.org/en/docs/
-After=network.target
-
-[Service]
-Type=forking
-PIDFile=/var/run/nginx.pid
-ExecStartPost=/bin/sleep 0.1
-ExecStartPre=%s -t -c %s
-ExecStart=%s -c %s
-ExecReload=/bin/kill -s HUP $MAINPID
-ExecStop=/bin/kill -s QUIT $MAINPID
-TimeoutStartSec=120
-LimitNOFILE=1000000
-LimitNPROC=1000000
-LimitCORE=1000000
-
-[Install]
-WantedBy=multi-user.target
-`, nginxBin, nginxConf, nginxBin, nginxConf)
+	return fmt.Sprintf(systemdUnitTemplate, nginxBin, nginxConf, nginxBin, nginxConf)
 }
 
 // RenderLogrotate returns the content for /etc/logrotate.d/nginx.
 func RenderLogrotate(c Config) string {
-	return fmt.Sprintf(`%s/*nginx.log {
-  daily
-  rotate 5
-  missingok
-  dateext
-  compress
-  notifempty
-  sharedscripts
-  postrotate
-    [ -e /var/run/nginx.pid ] && kill -USR1 $(cat /var/run/nginx.pid)
-  endscript
+	return fmt.Sprintf(logrotateTemplate, c.WWWLogsRoot)
 }
-`, c.WWWLogsRoot)
+
+// FormatProxyPass standardizes the proxy pass address (e.g. "8080" -> "http://127.0.0.1:8080").
+func FormatProxyPass(proxy string) string {
+	proxy = strings.TrimSpace(proxy)
+	if proxy == "" {
+		return ""
+	}
+	if !strings.HasPrefix(proxy, "http://") && !strings.HasPrefix(proxy, "https://") {
+		if strings.HasPrefix(proxy, ":") {
+			proxy = "http://127.0.0.1" + proxy
+		} else if !strings.Contains(proxy, "/") && !strings.Contains(proxy, ":") {
+			proxy = "http://127.0.0.1:" + proxy
+		} else {
+			proxy = "http://" + proxy
+		}
+	}
+	return proxy
+}
+
+// RenderVHostHTTP generates production-ready Nginx configuration for an HTTP virtual host.
+func RenderVHostHTTP(domain, root, proxyPass, wwwLogsRoot string) string {
+	proxyPass = FormatProxyPass(proxyPass)
+	logDir := strings.TrimRight(wwwLogsRoot, "/")
+	if logDir == "" {
+		logDir = "/data/wwwlogs"
+	}
+
+	accessLog := fmt.Sprintf("%s/%s_access.log", logDir, domain)
+	errorLog := fmt.Sprintf("%s/%s_error.log", logDir, domain)
+
+	if proxyPass != "" {
+		return fmt.Sprintf(vhostHTTPProxyTemplate, domain, accessLog, errorLog, root, proxyPass)
+	}
+
+	return fmt.Sprintf(vhostHTTPStaticTemplate, domain, accessLog, errorLog, root)
+}
+
+// RenderVHostSSL generates production-ready Nginx configuration with SSL and HTTP-to-HTTPS redirect.
+func RenderVHostSSL(domain, root, proxyPass, fullchain, privkey, wwwLogsRoot string) string {
+	proxyPass = FormatProxyPass(proxyPass)
+	logDir := strings.TrimRight(wwwLogsRoot, "/")
+	if logDir == "" {
+		logDir = "/data/wwwlogs"
+	}
+
+	accessLog := fmt.Sprintf("%s/%s_access.log", logDir, domain)
+	errorLog := fmt.Sprintf("%s/%s_error.log", logDir, domain)
+
+	var mainLocation string
+	if proxyPass != "" {
+		mainLocation = fmt.Sprintf(vhostSSLProxyLocationTemplate, proxyPass)
+	} else {
+		mainLocation = fmt.Sprintf(vhostSSLStaticLocationTemplate, root)
+	}
+
+	return fmt.Sprintf(vhostSSLTemplate, domain, root, domain, fullchain, privkey, accessLog, errorLog, mainLocation)
 }

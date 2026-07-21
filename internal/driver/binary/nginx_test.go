@@ -273,3 +273,56 @@ func TestNginxDriverCapabilities(t *testing.T) {
 		t.Errorf("NginxDriver does not implement driver.SSLManager")
 	}
 }
+
+func TestAddVHostProxyCreatesProxyConfig(t *testing.T) {
+	cfg := testNginxConfig(t)
+	drv := NewNginxDriver(cfg)
+	reloads := 0
+	oldReload := reloadNginx
+	reloadNginx = func() error {
+		reloads++
+		return nil
+	}
+	defer func() {
+		reloadNginx = oldReload
+	}()
+
+	if err := drv.AddVHostProxy("api.example.com", "8080"); err != nil {
+		t.Fatalf("AddVHostProxy: %v", err)
+	}
+
+	confPath := filepath.Join(cfg.GetString("nginx.install_path"), "conf", "vhost", "api.example.com.conf")
+	data, err := os.ReadFile(confPath)
+	if err != nil {
+		t.Fatalf("read conf: %v", err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "server_name api.example.com;") {
+		t.Fatalf("conf missing server_name: %s", text)
+	}
+	if !strings.Contains(text, "proxy_pass http://127.0.0.1:8080;") {
+		t.Fatalf("conf missing proxy_pass: %s", text)
+	}
+	if !strings.Contains(text, "proxy_set_header Host $host;") {
+		t.Fatalf("conf missing proxy headers: %s", text)
+	}
+	if reloads != 1 {
+		t.Fatalf("reloads after add proxy = %d, want 1", reloads)
+	}
+
+	// Test EnableSSL for Proxy VHost preserves proxy_pass
+	if err := drv.EnableSSL("api.example.com"); err != nil {
+		t.Fatalf("EnableSSL for proxy: %v", err)
+	}
+	sslData, err := os.ReadFile(confPath)
+	if err != nil {
+		t.Fatalf("read ssl conf: %v", err)
+	}
+	sslText := string(sslData)
+	if !strings.Contains(sslText, "listen 443 ssl;") {
+		t.Fatalf("ssl conf missing 443 server: %s", sslText)
+	}
+	if !strings.Contains(sslText, "proxy_pass http://127.0.0.1:8080;") {
+		t.Fatalf("ssl conf lost proxy_pass: %s", sslText)
+	}
+}
