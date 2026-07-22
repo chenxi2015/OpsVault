@@ -14,6 +14,7 @@ import (
 	"OpsVault/internal/driver"
 	"OpsVault/internal/system"
 	"OpsVault/pkg/fileutil"
+	"OpsVault/pkg/nginxconf"
 	"OpsVault/pkg/sslutil"
 	"OpsVault/pkg/sysutil"
 
@@ -166,6 +167,14 @@ func (d *NginxDriver) reloadNginxSafe() error {
 
 
 func (d *NginxDriver) AddVHost(domain, root string) error {
+	return d.AddVHostWithOptions(domain, root, "")
+}
+
+func (d *NginxDriver) AddVHostProxy(domain, proxyPass string) error {
+	return d.AddVHostWithOptions(domain, "", proxyPass)
+}
+
+func (d *NginxDriver) AddVHostWithOptions(domain, root, proxyPass string) error {
 	if domain == "" {
 		return fmt.Errorf("domain is required")
 	}
@@ -179,7 +188,8 @@ func (d *NginxDriver) AddVHost(domain, root string) error {
 	if err := fileutil.EnsureDir(filepath.Dir(confPath), 0o755); err != nil {
 		return err
 	}
-	conf := renderHTTPVHost(domain, root)
+	wwwLogsRoot := nginxConfigString(d.Config, "nginx.wwwlogs_root")
+	conf := nginxconf.RenderVHostHTTP(domain, root, proxyPass, wwwLogsRoot)
 	if err := os.WriteFile(confPath, []byte(conf), 0o644); err != nil {
 		return err
 	}
@@ -249,12 +259,16 @@ func (d *NginxDriver) EnableSSL(domain string) error {
 	}
 	root := extractRootPath(string(data))
 	if root == "" {
-		return fmt.Errorf("failed to extract root from %s", confPath)
+		root = filepath.Join(nginxConfigString(d.Config, "nginx.www_root"), domain)
 	}
+	proxyPass := extractProxyPassPath(string(data))
+
 	certDir := filepath.Join(nginxConfigString(d.Config, "nginx.ssl_root"), domain)
 	fullchain := filepath.Join(certDir, "fullchain.pem")
 	privkey := filepath.Join(certDir, "privkey.pem")
-	conf := renderSSLVHost(domain, root, fullchain, privkey)
+	wwwLogsRoot := nginxConfigString(d.Config, "nginx.wwwlogs_root")
+
+	conf := nginxconf.RenderVHostSSL(domain, root, proxyPass, fullchain, privkey, wwwLogsRoot)
 	if err := os.WriteFile(confPath, []byte(conf), 0o644); err != nil {
 		return err
 	}
@@ -269,9 +283,13 @@ func (d *NginxDriver) DisableSSL(domain string) error {
 	}
 	root := extractRootPath(string(data))
 	if root == "" {
-		return fmt.Errorf("failed to extract root from %s", confPath)
+		root = filepath.Join(nginxConfigString(d.Config, "nginx.www_root"), domain)
 	}
-	if err := os.WriteFile(confPath, []byte(renderHTTPVHost(domain, root)), 0o644); err != nil {
+	proxyPass := extractProxyPassPath(string(data))
+	wwwLogsRoot := nginxConfigString(d.Config, "nginx.wwwlogs_root")
+
+	conf := nginxconf.RenderVHostHTTP(domain, root, proxyPass, wwwLogsRoot)
+	if err := os.WriteFile(confPath, []byte(conf), 0o644); err != nil {
 		return err
 	}
 	return d.reloadNginxSafe()
@@ -298,19 +316,17 @@ func nginxConfigString(cfg *viper.Viper, key string) string {
 	}
 }
 
-func renderHTTPVHost(domain, root string) string {
-	return fmt.Sprintf("server {\n    listen 80;\n    server_name %s;\n    root %s;\n    index index.html index.htm;\n}\n", domain, root)
-}
-
-func renderSSLVHost(domain, root, fullchain, privkey string) string {
-	return fmt.Sprintf(
-		"server {\n    listen 80;\n    server_name %s;\n    return 301 https://$host$request_uri;\n}\n\nserver {\n    listen 443 ssl;\n    server_name %s;\n    root %s;\n    index index.html index.htm;\n    ssl_certificate %s;\n    ssl_certificate_key %s;\n}\n",
-		domain, domain, root, fullchain, privkey,
-	)
-}
-
 func extractRootPath(conf string) string {
 	re := regexp.MustCompile(`(?m)^\s*root\s+([^;]+);`)
+	matches := re.FindStringSubmatch(conf)
+	if len(matches) < 2 {
+		return ""
+	}
+	return strings.TrimSpace(matches[1])
+}
+
+func extractProxyPassPath(conf string) string {
+	re := regexp.MustCompile(`(?m)^\s*proxy_pass\s+([^;]+);`)
 	matches := re.FindStringSubmatch(conf)
 	if len(matches) < 2 {
 		return ""

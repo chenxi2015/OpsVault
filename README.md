@@ -95,6 +95,30 @@ opsvault bak restore my-init-backup -f
 opsvault bak delete my-init-backup
 ```
 
+## Nginx 服务与 vhost 虚拟主机管理
+
+OpsVault 内置生产级 Nginx vhost 配置生成器（支持独立日志隔离、安全 Header、Let's Encrypt 证书验证与 WebSocket 代理）：
+
+```bash
+# 1. 基础生命周期管理
+opsvault nginx install
+opsvault nginx start
+opsvault nginx status
+
+# 2. 添加静态 Web 站点虚拟主机
+opsvault nginx vhost add --domain web.example.com --root /data/wwwroot/web
+
+# 3. 添加后端服务端口反向代理 (支持 --proxy / -p 参数)
+# 自动将本地 8080 端口转发为标准 proxy_pass http://127.0.0.1:8080;
+opsvault nginx vhost add --domain api.example.com --proxy 8080
+
+# 也可显式指定后端服务 URL
+opsvault nginx vhost add --domain service.example.com --proxy http://127.0.0.1:9000
+
+# 4. Let's Encrypt SSL 证书申请与一键 HTTPS 绑定
+opsvault nginx ssl apply --domain api.example.com
+```
+
 ## 构建与测试
 
 ```bash

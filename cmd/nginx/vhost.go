@@ -18,6 +18,7 @@ func (c *commandSet) newVHostCommand() *cobra.Command {
 func (c *commandSet) newVHostAddCommand() *cobra.Command {
 	var domain string
 	var root string
+	var proxy string
 	cmd := &cobra.Command{
 		Use:   "add",
 		Short: "Add a virtual host",
@@ -29,11 +30,12 @@ func (c *commandSet) newVHostAddCommand() *cobra.Command {
 				}
 				root = filepath.Join(wwwRoot, domain)
 			}
-			return c.driver().AddVHost(domain, root)
+			return c.driver().AddVHostWithOptions(domain, root, proxy)
 		},
 	}
 	cmd.Flags().StringVar(&domain, "domain", "", "vhost domain")
 	cmd.Flags().StringVar(&root, "root", "", "website root path (defaults to {nginx.www_root}/{domain} from config)")
+	cmd.Flags().StringVarP(&proxy, "proxy", "p", "", "backend proxy address or port (e.g. 8080 or http://127.0.0.1:8080)")
 	_ = cmd.MarkFlagRequired("domain")
 	return cmd
 }

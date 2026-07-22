@@ -160,6 +160,7 @@ opsvault nginx upgrade
 
 # 虚拟主机vhost管理
 opsvault nginx vhost add --domain shturl. --root /data/wwwroot/xxx
+opsvault nginx vhost add --domain api.shturl. --proxy 8080
 opsvault nginx vhost del --domain shturl. [--delete-root]
 opsvault nginx vhost list
 
