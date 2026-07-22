@@ -231,8 +231,8 @@ func (d *ELKDriver) installES(ctx context.Context) error {
 
 	hostCfg := &container.HostConfig{
 		Binds: []string{
-			filepath.Join(d.DataDir, "conf", "elasticsearch.yml") + ":/usr/share/elasticsearch/config/elasticsearch.yml",
-			filepath.Join(d.DataDir, "data", "elasticsearch") + ":/usr/share/elasticsearch/data",
+			toDockerBind(filepath.Join(d.DataDir, "conf", "elasticsearch.yml"), "/usr/share/elasticsearch/config/elasticsearch.yml"),
+			toDockerBind(filepath.Join(d.DataDir, "data", "elasticsearch"), "/usr/share/elasticsearch/data"),
 		},
 		PortBindings: nat.PortMap{
 			nat.Port("9200/tcp"): []nat.PortBinding{{HostIP: d.BindIP, HostPort: esPort}},
@@ -286,7 +286,7 @@ func (d *ELKDriver) installKB(ctx context.Context) error {
 
 	hostCfg := &container.HostConfig{
 		Binds: []string{
-			filepath.Join(d.DataDir, "conf", "kibana.yml") + ":/usr/share/kibana/config/kibana.yml",
+			toDockerBind(filepath.Join(d.DataDir, "conf", "kibana.yml"), "/usr/share/kibana/config/kibana.yml"),
 		},
 		PortBindings: nat.PortMap{
 			nat.Port("5601/tcp"): []nat.PortBinding{{HostIP: d.BindIP, HostPort: kbPort}},
@@ -338,9 +338,9 @@ func (d *ELKDriver) installLS(ctx context.Context) error {
 
 	hostCfg := &container.HostConfig{
 		Binds: []string{
-			filepath.Join(d.DataDir, "conf", "logstash.yml") + ":/usr/share/logstash/config/logstash.yml",
-			filepath.Join(d.DataDir, "conf", "pipeline", "logstash.conf") + ":/usr/share/logstash/pipeline/logstash.conf",
-			filepath.Join(d.DataDir, "data", "logstash") + ":/usr/share/logstash/data",
+			toDockerBind(filepath.Join(d.DataDir, "conf", "logstash.yml"), "/usr/share/logstash/config/logstash.yml"),
+			toDockerBind(filepath.Join(d.DataDir, "conf", "pipeline", "logstash.conf"), "/usr/share/logstash/pipeline/logstash.conf"),
+			toDockerBind(filepath.Join(d.DataDir, "data", "logstash"), "/usr/share/logstash/data"),
 		},
 		PortBindings: nat.PortMap{
 			nat.Port("5044/tcp"): []nat.PortBinding{{HostIP: d.BindIP, HostPort: lsPort}},

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	ansiblecmd "OpsVault/cmd/ansible"
@@ -59,7 +60,11 @@ var rootCmd = &cobra.Command{
 		// Initialize audit log to the configured log storage path
 		logDir := config.GetString("log.storage_path")
 		if logDir == "" {
-			logDir = "/data/opsvault/logs"
+			if runtime.GOOS == "windows" {
+				logDir = filepath.Join(windowsDefaultRootDir(), "logs")
+			} else {
+				logDir = "/data/opsvault/logs"
+			}
 		}
 		logger.ConfigureAudit(logDir)
 		return nil
@@ -152,7 +157,16 @@ func CurrentMode(v *viper.Viper) driver.Mode {
 }
 
 func applyDefaultConfig(v *viper.Viper) {
-	v.SetDefault("system.root_dir", "/data/opsvault")
+	// Choose platform-appropriate default root directory.
+	// On Linux/macOS we use the conventional /data/opsvault;
+	// on Windows that path is awkward (requires admin rights on C:\), so we
+	// fall back to a directory beside the executable, or the current working
+	// directory, which is always writable without elevation.
+	defaultRootDir := "/data/opsvault"
+	if runtime.GOOS == "windows" {
+		defaultRootDir = windowsDefaultRootDir()
+	}
+	v.SetDefault("system.root_dir", defaultRootDir)
 	v.SetDefault("docker.name_prefix", "opsvault")
 	v.SetDefault("docker.network_name", "opsvault-net")
 	v.SetDefault("docker.cidr", "172.28.0.0/16")
@@ -232,7 +246,11 @@ func applyDefaultConfig(v *viper.Viper) {
 func resolveFallbackPaths(v *viper.Viper) {
 	rootDir := v.GetString("system.root_dir")
 	if rootDir == "" {
-		rootDir = "/data/opsvault"
+		if runtime.GOOS == "windows" {
+			rootDir = windowsDefaultRootDir()
+		} else {
+			rootDir = "/data/opsvault"
+		}
 		v.Set("system.root_dir", rootDir)
 	}
 
@@ -307,4 +325,21 @@ func isPathWritable(path string) bool {
 
 func newDockerClient() (*client.Client, error) {
 	return dockercli.New()
+}
+
+// windowsDefaultRootDir returns a sensible default data root on Windows.
+// It prefers a directory next to the executable so no admin elevation is
+// needed; if that cannot be determined it falls back to ./opsvault_data
+// relative to the current working directory.
+func windowsDefaultRootDir() string {
+	if exePath, err := os.Executable(); err == nil {
+		if realPath, err := filepath.EvalSymlinks(exePath); err == nil {
+			exePath = realPath
+		}
+		candidate := filepath.Join(filepath.Dir(exePath), "opsvault_data")
+		if isPathWritable(candidate) {
+			return candidate
+		}
+	}
+	return filepath.Join(".", "opsvault_data")
 }

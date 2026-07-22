@@ -95,7 +95,7 @@ func (d *MinIODriver) containerSpec() (*container.Config, *container.HostConfig,
 			},
 		}, &container.HostConfig{
 			Binds: []string{
-				filepath.Join(d.DataDir, "data") + ":/data",
+				toDockerBind(filepath.Join(d.DataDir, "data"), "/data"),
 			},
 			PortBindings: nat.PortMap{
 				port:        []nat.PortBinding{{HostIP: d.BindIP, HostPort: hostPort}},

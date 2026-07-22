@@ -91,8 +91,8 @@ func (d *RabbitMQDriver) containerSpec() (*container.Config, *container.HostConf
 			},
 		}, &container.HostConfig{
 			Binds: []string{
-				filepath.Join(d.DataDir, "data") + ":/var/lib/rabbitmq",
-				filepath.Join(d.DataDir, "conf", "rabbitmq.conf") + ":/etc/rabbitmq/rabbitmq.conf",
+				toDockerBind(filepath.Join(d.DataDir, "data"), "/var/lib/rabbitmq"),
+				toDockerBind(filepath.Join(d.DataDir, "conf", "rabbitmq.conf"), "/etc/rabbitmq/rabbitmq.conf"),
 			},
 			PortBindings: nat.PortMap{
 				portAMQP: []nat.PortBinding{{HostIP: d.BindIP, HostPort: hostPort}},

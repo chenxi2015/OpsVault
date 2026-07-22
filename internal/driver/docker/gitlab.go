@@ -79,9 +79,9 @@ func (d *GitLabDriver) containerSpec() (*container.Config, *container.HostConfig
 			},
 		}, &container.HostConfig{
 			Binds: []string{
-				filepath.Join(d.DataDir, "config") + ":/etc/gitlab",
-				filepath.Join(d.DataDir, "logs") + ":/var/log/gitlab",
-				filepath.Join(d.DataDir, "data") + ":/var/opt/gitlab",
+				toDockerBind(filepath.Join(d.DataDir, "config"), "/etc/gitlab"),
+				toDockerBind(filepath.Join(d.DataDir, "logs"), "/var/log/gitlab"),
+				toDockerBind(filepath.Join(d.DataDir, "data"), "/var/opt/gitlab"),
 			},
 			PortBindings: nat.PortMap{
 				port:      []nat.PortBinding{{HostIP: d.BindIP, HostPort: hostPort}},

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -694,4 +695,16 @@ func (d *BaseDriver) applyResources(hostCfg *container.HostConfig) {
 	hostCfg.RestartPolicy = container.RestartPolicy{
 		Name: container.RestartPolicyAlways,
 	}
+}
+
+// toDockerBind constructs a Docker bind-mount string "hostPath:containerPath".
+// On Windows, Docker Desktop (via WSL2 or Hyper-V) requires forward slashes in
+// the host path. filepath.Join produces backslashes on Windows, which would cause
+// the Docker API to misparse the colon in "C:\path:containerPath" as a volume
+// separator. This function normalises the host side to forward slashes.
+func toDockerBind(hostPath, containerPath string) string {
+	if runtime.GOOS == "windows" {
+		hostPath = filepath.ToSlash(hostPath)
+	}
+	return hostPath + ":" + containerPath
 }

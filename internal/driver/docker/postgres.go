@@ -66,7 +66,7 @@ func (d *PostgresDriver) containerSpec() (*container.Config, *container.HostConf
 				Retries:     10,
 			},
 		}, &container.HostConfig{
-			Binds: []string{filepath.Join(d.DataDir, "data") + ":/var/lib/postgresql/data"},
+			Binds: []string{toDockerBind(filepath.Join(d.DataDir, "data"), "/var/lib/postgresql/data")},
 			PortBindings: nat.PortMap{
 				port: []nat.PortBinding{{HostIP: d.BindIP, HostPort: hostPort}},
 			},

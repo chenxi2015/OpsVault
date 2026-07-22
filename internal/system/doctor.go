@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"OpsVault/pkg/dockercli"
 	"OpsVault/pkg/netutil"
@@ -127,7 +126,11 @@ func checkPrivilege() DiagnosticItem {
 
 func checkStorageWritable(config *viper.Viper) DiagnosticItem {
 	item := DiagnosticItem{Name: "持久化存储根目录"}
+	// Platform-aware default: Linux uses /data/opsvault; Windows uses a local path.
 	dataRoot := "/data/opsvault"
+	if runtime.GOOS == "windows" {
+		dataRoot = filepath.Join(".", "opsvault_data")
+	}
 	if config != nil && config.GetString("docker.data_root") != "" {
 		dataRoot = config.GetString("docker.data_root")
 	}
@@ -444,27 +447,12 @@ func checkCompilationTools() DiagnosticItem {
 
 func checkFileLimits() DiagnosticItem {
 	item := DiagnosticItem{Name: "系统文件句柄限制"}
-
-	var rlimit syscall.Rlimit
-	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rlimit)
-	if err != nil {
-		item.Status = StatusWarn
-		item.Message = fmt.Sprintf("无法获取系统文件句柄限制: %v", err)
+	if runtime.GOOS == "windows" {
+		item.Status = StatusOk
+		item.Message = "Windows 平台不适用文件句柄限制检查 (无 ulimit 概念)"
 		return item
 	}
-
-	// Check current soft limit
-	softLimit := rlimit.Cur
-	if softLimit < 65535 {
-		item.Status = StatusWarn
-		item.Message = fmt.Sprintf("当前最大文件描述符限制较小 (ulimit -n = %d)", softLimit)
-		item.Suggestion = "建议在 /etc/security/limits.conf 中配置 '* soft nofile 1000000' 和 '* hard nofile 1000000' 以优化性能。"
-	} else {
-		item.Status = StatusOk
-		item.Message = fmt.Sprintf("文件描述符限制检查通过 (ulimit -n = %d)", softLimit)
-	}
-
-	return item
+	return checkFileLimitsPosix()
 }
 
 func visualWidth(s string) int {

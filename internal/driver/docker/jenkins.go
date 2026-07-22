@@ -71,7 +71,7 @@ func (d *JenkinsDriver) containerSpec() (*container.Config, *container.HostConfi
 			},
 		}, &container.HostConfig{
 			Binds: []string{
-				filepath.Join(d.DataDir, "data") + ":/var/jenkins_home",
+				toDockerBind(filepath.Join(d.DataDir, "data"), "/var/jenkins_home"),
 			},
 			PortBindings: nat.PortMap{
 				port:      []nat.PortBinding{{HostIP: d.BindIP, HostPort: hostPort}},

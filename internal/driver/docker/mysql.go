@@ -70,8 +70,8 @@ func (d *MySQLDriver) containerSpec() (*container.Config, *container.HostConfig,
 			},
 		}, &container.HostConfig{
 			Binds: []string{
-				filepath.Join(d.DataDir, "data") + ":/var/lib/mysql",
-				filepath.Join(d.DataDir, "conf", "my.cnf") + ":/etc/mysql/conf.d/my.cnf",
+				toDockerBind(filepath.Join(d.DataDir, "data"), "/var/lib/mysql"),
+				toDockerBind(filepath.Join(d.DataDir, "conf", "my.cnf"), "/etc/mysql/conf.d/my.cnf"),
 			},
 			PortBindings: nat.PortMap{
 				port: []nat.PortBinding{{HostIP: d.BindIP, HostPort: hostPort}},

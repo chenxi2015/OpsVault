@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/docker/docker/api/types/network"
@@ -48,6 +49,10 @@ func New() (*client.Client, error) {
 
 func CleanOrphanedBridges(ctx context.Context, cli *client.Client) error {
 	if cli == nil {
+		return nil
+	}
+	// /sys/class/net and `ip link` are Linux-only; skip on other platforms.
+	if runtime.GOOS != "linux" {
 		return nil
 	}
 	networks, err := cli.NetworkList(ctx, network.ListOptions{})

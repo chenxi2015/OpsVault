@@ -123,8 +123,8 @@ func (d *NacosDriver) containerSpec() (*container.Config, *container.HostConfig,
 			},
 		}, &container.HostConfig{
 			Binds: []string{
-				filepath.Join(d.DataDir, "data") + ":/home/nacos/data",
-				filepath.Join(d.DataDir, "logs") + ":/home/nacos/logs",
+				toDockerBind(filepath.Join(d.DataDir, "data"), "/home/nacos/data"),
+				toDockerBind(filepath.Join(d.DataDir, "logs"), "/home/nacos/logs"),
 			},
 			PortBindings: nat.PortMap{
 				port:      []nat.PortBinding{{HostIP: d.BindIP, HostPort: hostPort}},

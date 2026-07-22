@@ -80,8 +80,8 @@ func (d *RedisDriver) containerSpec() (*container.Config, *container.HostConfig,
 			},
 		}, &container.HostConfig{
 			Binds: []string{
-				filepath.Join(d.DataDir, "data") + ":/data",
-				filepath.Join(d.DataDir, "conf", "redis.conf") + ":/usr/local/etc/redis/redis.conf",
+				toDockerBind(filepath.Join(d.DataDir, "data"), "/data"),
+				toDockerBind(filepath.Join(d.DataDir, "conf", "redis.conf"), "/usr/local/etc/redis/redis.conf"),
 			},
 			PortBindings: nat.PortMap{
 				port: []nat.PortBinding{{HostIP: d.BindIP, HostPort: hostPort}},

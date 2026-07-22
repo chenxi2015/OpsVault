@@ -74,8 +74,8 @@ exec sh mqbroker -n 127.0.0.1:9876 -c /home/rocketmq/rocketmq-opsvault.conf
 			},
 		}, &container.HostConfig{
 			Binds: []string{
-				filepath.Join(d.DataDir, "data") + ":/home/rocketmq/store",
-				filepath.Join(d.DataDir, "conf", "broker.conf") + ":/home/rocketmq/rocketmq-opsvault.conf",
+				toDockerBind(filepath.Join(d.DataDir, "data"), "/home/rocketmq/store"),
+				toDockerBind(filepath.Join(d.DataDir, "conf", "broker.conf"), "/home/rocketmq/rocketmq-opsvault.conf"),
 			},
 			PortBindings: nat.PortMap{
 				portNameSrv: []nat.PortBinding{{HostIP: d.BindIP, HostPort: namesrvPort}},
