@@ -68,12 +68,12 @@ func GenerateInventoryFile(cfg *Config) (string, error) {
 
 	var builder strings.Builder
 
-	for _, group := range cfg.Groups {
+	for gIdx, group := range cfg.Groups {
 		if group.Name == "" {
 			continue
 		}
 		builder.WriteString(fmt.Sprintf("[%s]\n", group.Name))
-		for _, host := range group.Hosts {
+		for hIdx, host := range group.Hosts {
 			if host.IP == "" {
 				continue
 			}
@@ -86,7 +86,10 @@ func GenerateInventoryFile(cfg *Config) (string, error) {
 				user = "root"
 			}
 
-			line := fmt.Sprintf("%s ansible_port=%d ansible_user=%s", host.IP, port, user)
+			// Generate a unique alias per host entry to prevent Ansible from merging hostvars of duplicate IPs
+			hostAlias := fmt.Sprintf("%s_%d_%d_%d", host.IP, port, gIdx, hIdx)
+
+			line := fmt.Sprintf("%s ansible_host=%s ansible_port=%d ansible_user=%s", hostAlias, host.IP, port, user)
 			if host.SSHPrivateKey != "" {
 				line += fmt.Sprintf(" ansible_ssh_private_key_file=%s", host.SSHPrivateKey)
 			}
@@ -96,8 +99,8 @@ func GenerateInventoryFile(cfg *Config) (string, error) {
 			if host.PythonInterpreter != "" {
 				line += fmt.Sprintf(" ansible_python_interpreter=%s", host.PythonInterpreter)
 			}
-			// Strict host key checking disable to prevent interactive prompts
-			line += " ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
+			// Strict host key checking disable and bypass known_hosts to handle port-forwarded / changed host keys
+			line += " ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
 			builder.WriteString(line)
 			builder.WriteString("\n")
 		}

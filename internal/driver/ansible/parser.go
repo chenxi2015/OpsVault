@@ -47,8 +47,13 @@ func ParseDoctorOutput(raw string) []HostStatus {
 		matches := hostHeaderRegexp.FindStringSubmatch(line)
 		if len(matches) > 0 {
 			flushCurrent()
+			rawHost := matches[1]
+			ip := rawHost
+			if idx := strings.Index(rawHost, "_"); idx != -1 {
+				ip = rawHost[:idx]
+			}
 			currentHost = &HostStatus{
-				IP:     matches[1],
+				IP:     ip,
 				Status: matches[2],
 			}
 			currentLines = []string{}
@@ -174,8 +179,13 @@ func ParsePingOutput(raw string) []PingStatus {
 			if current != nil {
 				hosts = append(hosts, *current)
 			}
+			rawHost := matches[1]
+			ip := rawHost
+			if idx := strings.Index(rawHost, "_"); idx != -1 {
+				ip = rawHost[:idx]
+			}
 			current = &hostRaw{
-				IP:     matches[1],
+				IP:     ip,
 				Status: matches[2],
 			}
 			if strings.Contains(line, "{") {
@@ -194,10 +204,10 @@ func ParsePingOutput(raw string) []PingStatus {
 	for _, h := range hosts {
 		status := h.Status
 		var msg string
-		
+
 		// Attempt to extract JSON from lines
 		jsonStr := extractJSONFromLines(h.Lines)
-		
+
 		cleanedJSON := strings.TrimSpace(jsonStr)
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(cleanedJSON), &data); err == nil {
@@ -259,5 +269,3 @@ func extractJSONFromLines(lines []string) string {
 	}
 	return strings.Join(jsonLines, "\n")
 }
-
-
