@@ -16,6 +16,7 @@ func (c *commandSet) newPushCommand() *cobra.Command {
 	var group string
 	var binPath string
 	var cfgPath string
+	var scriptsPath string
 	var force bool
 
 	cmd := &cobra.Command{
@@ -61,6 +62,38 @@ func (c *commandSet) newPushCommand() *cobra.Command {
 				return fmt.Errorf("config file not found at %s: %w", cfgPath, err)
 			}
 
+			// Resolve scripts directory: use flag value if provided, otherwise auto-detect
+			absScriptsPath := ""
+			if scriptsPath != "" {
+				absScriptsPath, err = filepath.Abs(scriptsPath)
+				if err != nil {
+					return fmt.Errorf("failed to get absolute path for scripts %s: %w", scriptsPath, err)
+				}
+				if _, err := os.Stat(absScriptsPath); err != nil {
+					return fmt.Errorf("scripts directory not found at %s: %w", absScriptsPath, err)
+				}
+			} else {
+				// Auto-detect: look for scripts/ next to the binary or in cwd
+				candidates := []string{
+					filepath.Join(filepath.Dir(binPath), "scripts"),
+					"./scripts",
+				}
+				for _, candidate := range candidates {
+					if abs, err := filepath.Abs(candidate); err == nil {
+						if info, err := os.Stat(abs); err == nil && info.IsDir() {
+							absScriptsPath = abs
+							break
+						}
+					}
+				}
+			}
+
+			if absScriptsPath != "" {
+				fmt.Printf("Scripts directory detected: %s\n", absScriptsPath)
+			} else {
+				fmt.Println("No scripts directory found, skipping scripts upload.")
+			}
+
 			exec, cleanup, err := c.getExecutor()
 			if err != nil {
 				return err
@@ -82,6 +115,7 @@ func (c *commandSet) newPushCommand() *cobra.Command {
 				DataRoot:    dataRoot,
 				BinaryPath:  binPath,
 				ConfigPath:  cfgPath,
+				ScriptsPath: absScriptsPath,
 				Force:       force,
 			}
 
@@ -108,7 +142,9 @@ func (c *commandSet) newPushCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&group, "group", "g", "all", "target host group for push")
 	cmd.Flags().StringVar(&binPath, "bin", "./bin/opsvault-linux-amd64", "local path to OpsVault executable binary")
 	cmd.Flags().StringVar(&cfgPath, "config-path", "./configs/default.yaml", "local path to configuration file to push")
+	cmd.Flags().StringVar(&scriptsPath, "scripts-path", "", "local path to scripts directory to push (auto-detected if omitted)")
 	cmd.Flags().BoolVar(&force, "force", false, "force overwrite remote configuration file")
 
 	return cmd
 }
+

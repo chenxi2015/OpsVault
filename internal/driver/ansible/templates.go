@@ -533,7 +533,7 @@ var PlaybookTemplates = map[string]string{
   hosts: {{ .TargetGroup }}
   become: yes
   tasks:
-    - name: Ensure target bin and configs directories exist
+    - name: Ensure target bin, configs and scripts directories exist
       file:
         path: "{{ "{{" }} item {{ "}}" }}"
         state: directory
@@ -541,6 +541,7 @@ var PlaybookTemplates = map[string]string{
       loop:
         - "{{ .DataRoot }}/bin"
         - "{{ .DataRoot }}/configs"
+        - "{{ .DataRoot }}/bin/scripts"
 
     - name: Copy OpsVault executable binary
       copy:
@@ -555,6 +556,15 @@ var PlaybookTemplates = map[string]string{
         mode: '0644'
         force: {{ if .Force }}yes{{ else }}no{{ end }}
         backup: yes
+
+{{- if .ScriptsPath }}
+    - name: Copy scripts directory to remote
+      copy:
+        src: "{{ .ScriptsPath }}/"
+        dest: "{{ .DataRoot }}/bin/scripts/"
+        mode: '0755'
+        directory_mode: '0755'
+{{- end }}
 
     - name: Create global symlink for opsvault in /usr/local/bin
       file:

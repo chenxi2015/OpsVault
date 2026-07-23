@@ -25,6 +25,7 @@ type PlaybookVars struct {
 	RegistryMirrors   []string
 	BinaryPath        string
 	ConfigPath        string
+	ScriptsPath       string
 	Purge             bool
 	Force             bool
 	ServiceName       string
