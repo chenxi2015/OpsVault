@@ -326,3 +326,38 @@ func TestAddVHostProxyCreatesProxyConfig(t *testing.T) {
 		t.Fatalf("ssl conf lost proxy_pass: %s", sslText)
 	}
 }
+
+func TestGetNologinShell(t *testing.T) {
+	shell := getNologinShell()
+	if shell == "" {
+		t.Fatalf("getNologinShell returned empty string")
+	}
+	validShells := map[string]bool{
+		"/sbin/nologin":     true,
+		"/usr/sbin/nologin": true,
+		"/bin/false":        true,
+	}
+	if !validShells[shell] && !strings.HasSuffix(shell, "nologin") {
+		t.Fatalf("unexpected nologin shell path: %s", shell)
+	}
+}
+
+func TestEnsureSymlinks(t *testing.T) {
+	cfg := testNginxConfig(t)
+	installer := newNginxInstaller(cfg)
+	
+	// Create mock nginx binary in install path
+	binPath := filepath.Join(cfg.GetString("nginx.install_path"), "sbin", "nginx")
+	if err := os.MkdirAll(filepath.Dir(binPath), 0o755); err != nil {
+		t.Fatalf("mkdir sbin: %v", err)
+	}
+	if err := os.WriteFile(binPath, []byte("mock nginx"), 0o755); err != nil {
+		t.Fatalf("write mock binary: %v", err)
+	}
+
+	if err := installer.ensureSymlinks(); err != nil {
+		t.Fatalf("ensureSymlinks failed: %v", err)
+	}
+}
+
+

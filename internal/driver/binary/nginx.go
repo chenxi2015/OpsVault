@@ -39,7 +39,7 @@ func (d *NginxDriver) isLinuxOrTest() bool {
 
 func (d *NginxDriver) Install() error {
 	if !d.isLinuxOrTest() {
-		return fmt.Errorf("nginx binary installation is only supported on Linux (CentOS/CentOS Stream)")
+		return fmt.Errorf("nginx binary installation is only supported on Linux (CentOS/RHEL/Debian/Ubuntu)")
 	}
 	if err := newNginxInstaller(d.Config).Install(); err != nil {
 		return err
@@ -82,6 +82,13 @@ func (d *NginxDriver) Uninstall(purgeData bool) error {
 	_ = system.StopService("nginx")
 	_ = system.DisableService("nginx")
 	plan := newNginxInstallPlan(d.Config)
+	for _, target := range []string{"/usr/sbin/nginx", "/usr/local/bin/nginx"} {
+		if link, err := os.Readlink(target); err == nil {
+			if strings.Contains(link, plan.installPath) {
+				_ = os.Remove(target)
+			}
+		}
+	}
 	for _, path := range []string{plan.installPath, plan.systemdUnitPath, plan.logrotatePath} {
 		if err := fileutil.RemoveIfExists(path); err != nil {
 			return err
@@ -164,7 +171,6 @@ func (d *NginxDriver) reloadNginxSafe() error {
 	}
 	return reloadNginx()
 }
-
 
 func (d *NginxDriver) AddVHost(domain, root string) error {
 	return d.AddVHostWithOptions(domain, root, "")
@@ -410,4 +416,3 @@ func (d *NginxDriver) CheckExisting() (bool, string) {
 
 	return false, ""
 }
-

@@ -46,6 +46,7 @@ type nginxInstaller struct {
 var runNginxCommand = func(dir, name string, args ...string) ([]byte, error) {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
 	var buf bytes.Buffer
 	cmd.Stdout = io.MultiWriter(log.Writer(), &buf)
 	cmd.Stderr = io.MultiWriter(log.Writer(), &buf)
@@ -144,6 +145,9 @@ func (i *nginxInstaller) Install() error {
 	if err := i.compileAndInstall(); err != nil {
 		return err
 	}
+	if err := i.ensureSymlinks(); err != nil {
+		return err
+	}
 	if err := i.writeRuntimeFiles(); err != nil {
 		return err
 	}
@@ -156,11 +160,62 @@ func (i *nginxInstaller) Install() error {
 	return system.StartService("nginx")
 }
 
+func (i *nginxInstaller) ensureSymlinks() error {
+	binPath := filepath.Join(i.plan.installPath, "sbin", "nginx")
+	symlinks := []string{"/usr/sbin/nginx", "/usr/local/bin/nginx"}
+	for _, target := range symlinks {
+		if info, err := os.Lstat(target); err == nil {
+			if info.Mode()&os.ModeSymlink != 0 {
+				_ = os.Remove(target)
+			} else {
+				continue
+			}
+		}
+		_ = fileutil.EnsureDir(filepath.Dir(target), 0o755)
+		_ = os.Symlink(binPath, target)
+	}
+	return nil
+}
+
+func getNologinShell() string {
+	for _, path := range []string{"/sbin/nologin", "/usr/sbin/nologin", "/bin/false"} {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	if path, err := exec.LookPath("nologin"); err == nil {
+		return path
+	}
+	return "/sbin/nologin"
+}
+
 func (i *nginxInstaller) ensureHostDependencies() error {
+	if _, err := exec.LookPath("apt-get"); err == nil {
+		_, _ = runNginxCommand("", "apt-get", "update", "-y")
+		packages := []string{
+			"build-essential", "cmake", "autoconf", "tar", "gzip", "patch",
+			"zlib1g-dev", "libssl-dev", "libgd-dev", "libperl-dev",
+			"net-tools", "wget", "curl", "logrotate", "libjemalloc-dev",
+		}
+		args := append([]string{"install", "-y"}, packages...)
+		if output, err := runNginxCommand("", "apt-get", args...); err != nil {
+			return fmt.Errorf("install nginx build dependencies: %w: %s", err, string(output))
+		}
+
+		// Try libpcre2-dev (standard on Ubuntu 22.04+/Debian 12+), fallback to libpcre3-dev (older distros)
+		if _, err := runNginxCommand("", "apt-get", "install", "-y", "libpcre2-dev"); err != nil {
+			_, _ = runNginxCommand("", "apt-get", "install", "-y", "libpcre3-dev")
+		}
+		return nil
+	}
+
 	manager := "yum"
 	if _, err := exec.LookPath("dnf"); err == nil {
 		manager = "dnf"
+	} else if _, err := exec.LookPath("yum"); err != nil {
+		return fmt.Errorf("no supported package manager found (apt-get, dnf, or yum required)")
 	}
+
 	packages := []string{
 		"gcc", "gcc-c++", "make", "cmake", "autoconf", "tar", "gzip", "patch",
 		"pcre-devel", "zlib", "zlib-devel", "openssl", "openssl-devel",
@@ -181,9 +236,10 @@ func (i *nginxInstaller) ensureRuntimeUser() error {
 			return fmt.Errorf("create nginx group %s: %w: %s", i.plan.runGroup, err, string(output))
 		}
 	}
+	nologin := getNologinShell()
 	// getent passwd exits non-zero when the user does not exist, no stderr noise
 	if output, err := runNginxCommand("", "getent", "passwd", i.plan.runUser); err != nil {
-		if output, err = runNginxCommand("", "useradd", "-g", i.plan.runGroup, "-M", "-s", "/sbin/nologin", i.plan.runUser); err != nil {
+		if output, err = runNginxCommand("", "useradd", "-g", i.plan.runGroup, "-M", "-s", nologin, i.plan.runUser); err != nil {
 			return fmt.Errorf("create nginx user %s: %w: %s", i.plan.runUser, err, string(output))
 		}
 	}
