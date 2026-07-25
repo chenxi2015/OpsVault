@@ -76,6 +76,9 @@ func newInitModel() *initModel {
 			{name: "gitlab", selected: false},
 			{name: "minio", selected: false},
 			{name: "nacos", selected: false},
+			{name: "prometheus", selected: false},
+			{name: "grafana", selected: false},
+			{name: "node-exporter", selected: false},
 		},
 	}
 }

@@ -11,12 +11,15 @@ import (
 	ansiblecmd "OpsVault/cmd/ansible"
 	"OpsVault/cmd/elk"
 	"OpsVault/cmd/gitlab"
+	"OpsVault/cmd/grafana"
 	"OpsVault/cmd/jenkins"
 	"OpsVault/cmd/minio"
 	"OpsVault/cmd/mysql"
 	"OpsVault/cmd/nacos"
 	"OpsVault/cmd/nginx"
+	"OpsVault/cmd/nodeexporter"
 	"OpsVault/cmd/postgres"
+	"OpsVault/cmd/prometheus"
 	"OpsVault/cmd/rabbitmq"
 	"OpsVault/cmd/redis"
 	"OpsVault/cmd/rocketmq"
@@ -108,6 +111,9 @@ func init() {
 	rootCmd.AddCommand(gitlab.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(minio.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(nacos.NewCommand(config, dockerFactory))
+	rootCmd.AddCommand(prometheus.NewCommand(config, dockerFactory))
+	rootCmd.AddCommand(grafana.NewCommand(config, dockerFactory))
+	rootCmd.AddCommand(nodeexporter.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(newBakCommand(config))
 	rootCmd.AddCommand(newMigrateCommand(config))
 	rootCmd.AddCommand(ansiblecmd.NewCommand(config))
@@ -233,6 +239,18 @@ func applyDefaultConfig(v *viper.Viper) {
 	v.SetDefault("nacos.grpc_port_2", 9849)
 	v.SetDefault("nacos.auth_enable", true)
 	v.SetDefault("nacos.auth_token", "")
+
+	v.SetDefault("prometheus.image", "prom/prometheus:latest")
+	v.SetDefault("prometheus.port", 9090)
+
+	v.SetDefault("grafana.image", "grafana/grafana:latest")
+	v.SetDefault("grafana.port", 3000)
+	v.SetDefault("grafana.admin_user", "admin")
+	v.SetDefault("grafana.admin_password", "")
+
+	v.SetDefault("node_exporter.image", "prom/node-exporter:latest")
+	v.SetDefault("node_exporter.port", 9100)
+
 	v.SetDefault("log.level", "info")
 
 	v.SetDefault("log.storage_path", "")

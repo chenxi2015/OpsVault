@@ -514,3 +514,57 @@ func TestMinIODriverCapability(t *testing.T) {
 		t.Fatalf("MinIODriver does not implement driver.LogReader")
 	}
 }
+
+func TestPrometheusContainerSpec(t *testing.T) {
+	drv := NewPrometheusDriver(WrapClient(nil), testConfigWithRoot("/data/opsvault"))
+	cfg, host, err := drv.containerSpec()
+	if err != nil {
+		t.Fatalf("containerSpec: %v", err)
+	}
+	if cfg.Image != "prom/prometheus:latest" {
+		t.Fatalf("image = %q", cfg.Image)
+	}
+	promPort := nat.Port("9090/tcp")
+	if host.PortBindings[promPort][0].HostPort != "9090" {
+		t.Fatalf("port binding = %#v", host.PortBindings[promPort])
+	}
+}
+
+func TestGrafanaContainerSpec(t *testing.T) {
+	drv := NewGrafanaDriver(WrapClient(nil), testConfigWithRoot("/data/opsvault"), "secret123")
+	cfg, host, err := drv.containerSpec()
+	if err != nil {
+		t.Fatalf("containerSpec: %v", err)
+	}
+	if cfg.Image != "grafana/grafana:latest" {
+		t.Fatalf("image = %q", cfg.Image)
+	}
+	var foundPass bool
+	for _, env := range cfg.Env {
+		if env == "GF_SECURITY_ADMIN_PASSWORD=secret123" {
+			foundPass = true
+		}
+	}
+	if !foundPass {
+		t.Fatalf("env pass missing, env = %#v", cfg.Env)
+	}
+	grafPort := nat.Port("3000/tcp")
+	if host.PortBindings[grafPort][0].HostPort != "3000" {
+		t.Fatalf("port binding = %#v", host.PortBindings[grafPort])
+	}
+}
+
+func TestNodeExporterContainerSpec(t *testing.T) {
+	drv := NewNodeExporterDriver(WrapClient(nil), testConfigWithRoot("/data/opsvault"))
+	cfg, host, err := drv.containerSpec()
+	if err != nil {
+		t.Fatalf("containerSpec: %v", err)
+	}
+	if cfg.Image != "prom/node-exporter:latest" {
+		t.Fatalf("image = %q", cfg.Image)
+	}
+	if host.NetworkMode != "host" || host.PidMode != "host" {
+		t.Fatalf("network/pid mode = %q / %q", host.NetworkMode, host.PidMode)
+	}
+}
+

@@ -33,6 +33,9 @@ func (p RuntimeStatusProvider) Services() []ServiceRef {
 		{Name: "gitlab", Driver: dockdrv.NewGitLabDriver(dockdrv.WrapClient(cli), p.config)},
 		{Name: "minio", Driver: dockdrv.NewMinIODriver(dockdrv.WrapClient(cli), p.config, "")},
 		{Name: "nacos", Driver: dockdrv.NewNacosDriver(dockdrv.WrapClient(cli), p.config, "")},
+		{Name: "prometheus", Driver: dockdrv.NewPrometheusDriver(dockdrv.WrapClient(cli), p.config)},
+		{Name: "grafana", Driver: dockdrv.NewGrafanaDriver(dockdrv.WrapClient(cli), p.config, "")},
+		{Name: "node-exporter", Driver: dockdrv.NewNodeExporterDriver(dockdrv.WrapClient(cli), p.config)},
 	}
 }
 

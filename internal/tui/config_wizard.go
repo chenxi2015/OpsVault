@@ -133,6 +133,29 @@ var ConfigCategories = []ConfigCategory{
 		},
 	},
 	{
+		Name: "Prometheus",
+		Keys: []string{
+			"prometheus.image",
+			"prometheus.port",
+		},
+	},
+	{
+		Name: "Grafana",
+		Keys: []string{
+			"grafana.image",
+			"grafana.port",
+			"grafana.admin_user",
+			"grafana.admin_password",
+		},
+	},
+	{
+		Name: "Node Exporter",
+		Keys: []string{
+			"node_exporter.image",
+			"node_exporter.port",
+		},
+	},
+	{
 		Name: "System Settings",
 		Keys: []string{
 			"log.level",
