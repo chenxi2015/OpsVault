@@ -1,6 +1,8 @@
 package nodeexporter
 
 import (
+	"OpsVault/cmd/common"
+	"OpsVault/internal/driver"
 	"OpsVault/internal/driver/docker"
 
 	"github.com/docker/docker/client"
@@ -16,15 +18,20 @@ type commandSet struct {
 // NewCommand creates and returns a new cobra.Command for Node Exporter service management
 func NewCommand(cfg *viper.Viper, dockerFactory func() (*client.Client, error)) *cobra.Command {
 	c := &commandSet{config: cfg, dockerFactory: dockerFactory}
+	getMode := func() string { return cfg.GetString("mode") }
+	getDriver := func() (driver.ServiceDriver, error) {
+		return c.driver()
+	}
+
 	cmd := &cobra.Command{Use: "node-exporter", Short: "Manage Node Exporter hardware & system metrics agent"}
 	cmd.AddCommand(
 		c.newInstallCommand(),
-		c.newStartCommand(),
-		c.newStopCommand(),
-		c.newRestartCommand(),
-		c.newUninstallCommand(),
+		common.NewStartCmd("Node Exporter", getMode, getDriver),
+		common.NewStopCmd("Node Exporter", getMode, getDriver),
+		common.NewRestartCmd("Node Exporter", getMode, getDriver),
+		common.NewUninstallCmd("Node Exporter", getMode, getDriver),
 		c.newUpgradeCommand(),
-		c.newStatusCommand(),
+		common.NewStatusCmd("Node Exporter", getMode, getDriver),
 		c.newLogCommand(),
 	)
 	return cmd

@@ -71,12 +71,11 @@ OpsVault/
 ├── cmd/                    # Cobra命令入口
 │   ├── root.go             # 根命令、viper初始化、docker客户端全局加载、全局flag
 │   ├── tui.go              # 统一TUI总入口：opsvault tui
+│   ├── common/             # CLI公共工具与通用生命周期命令工厂
+│   │   ├── common.go       # 状态输出与格式化工具
+│   │   └── factory.go      # 通用 Start/Stop/Restart/Status/Uninstall/Log 子命令工厂
 │   ├── nginx/              # Nginx二进制子命令组
 │   │   ├── install.go
-│   │   ├── start.go
-│   │   ├── stop.go
-│   │   ├── restart.go
-│   │   ├── uninstall.go
 │   │   ├── upgrade.go
 │   │   ├── vhost.go        # 虚拟主机增删查改
 │   │   ├── ssl.go          # SSL证书申请/绑定/续期/删除
@@ -85,8 +84,15 @@ OpsVault/
 │   ├── redis/              # Docker部署Redis
 │   ├── rocketmq/           # Docker部署RocketMQ
 │   ├── rabbitmq/           # Docker部署RabbitMQ
-│   ├── postgres/           # 预留PostgreSQL（Docker驱动）
+│   ├── postgres/           # Docker部署PostgreSQL
 │   ├── minio/              # Docker部署MinIO
+│   ├── prometheus/         # Docker部署Prometheus
+│   ├── grafana/            # Docker部署Grafana
+│   ├── nodeexporter/       # Docker部署Node Exporter
+│   ├── nacos/              # Docker部署Nacos
+│   ├── elk/                # Docker部署ELK Stack
+│   ├── gitlab/             # Docker部署GitLab
+│   ├── jenkins/            # Docker部署Jenkins
 │   └── ansible/            # Ansible多机编排、下发分发与回收
 │       ├── root.go         # 根入口与多环境加载 (-e test|prod)
 │       ├── ping.go         # 批量连通性测试
@@ -404,3 +410,4 @@ log:
 5.  代码分层清晰，禁止跨包循环导入，公共工具统一放入 `pkg` 目录。
 6.  所有操作增加错误捕获、日志输出，全局支持 `--debug` flag 打印详细执行日志。
 7.  严格区分 Docker 驱动与 Binary 驱动，Nginx 仅使用 Binary 驱动，其余默认 Docker。
+8.  CLI 子命令统一遵循工厂规约：所有通用生命周期命令（Start / Stop / Restart / Status / Uninstall / Log）统一使用 `cmd/common/factory.go` 工厂函数构建，严禁为各中间件单独手写重复的生命周期子命令源文件。

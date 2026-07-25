@@ -509,70 +509,11 @@ func (m *RootModel) handleInputSubmit() (tea.Model, tea.Cmd) {
 
 func (m *RootModel) handleShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.active == 3 { // Doctor Tab
-		if msg.String() == "r" {
-			m.doctorRunning = true
-			return m, m.runDiagnosticsCmd()
-		}
-		return m, nil
+		return m.handleDoctorShortcuts(msg)
 	}
 
-	if m.active == 4 {
-		if msg.String() == "enter" {
-			if m.focus == focusSidebar {
-				m.focus = focusDetail
-				m.selectedConfigItem = 0
-				return m, nil
-			} else if m.focus == focusDetail {
-				cat := ConfigCategories[m.selectedConfigCategory]
-				if m.selectedConfigItem < len(cat.Keys) {
-					configKey := cat.Keys[m.selectedConfigItem]
-					m.editing = true
-					m.textInputPrompt = fmt.Sprintf("Enter new value for %s:", configKey)
-					m.textInputState = "config|" + configKey
-					m.textInputValue = m.config.GetString(configKey)
-					return m, nil
-				}
-			}
-		}
-		if msg.String() == "esc" {
-			if m.focus == focusDetail {
-				m.focus = focusSidebar
-				return m, nil
-			}
-		}
-		if msg.String() == "s" {
-			m.drawerMode = drawerTasks
-			m.drawerContent = "Saving configurations to configs/default.yaml..."
-			return m, func() tea.Msg {
-				var err error
-				if m.config != nil {
-					if m.config.ConfigFileUsed() != "" {
-						err = m.config.WriteConfig()
-					} else {
-						targetPath := fileutil.GetDefaultWriteConfigPath()
-						if errDir := fileutil.EnsureDir(filepath.Dir(targetPath), 0755); errDir == nil {
-							err = m.config.WriteConfigAs(targetPath)
-							if err == nil {
-								m.config.SetConfigFile(targetPath)
-							}
-						} else {
-							err = errDir
-						}
-					}
-				}
-				output := "Configuration successfully saved."
-				if err != nil {
-					output = fmt.Sprintf("Error saving configuration: %v", err)
-				}
-				return taskFinishedMsg{
-					ServiceName: "config",
-					ActionName:  "save",
-					Output:      output,
-					Err:         err,
-				}
-			}
-		}
-		return m, nil
+	if m.active == 4 { // Config Tab
+		return m.handleConfigShortcuts(msg)
 	}
 
 	var selectedSvc ServiceRef
@@ -603,69 +544,144 @@ func (m *RootModel) handleShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if !hasSvc {
-		// Handle Nginx VHosts and Certificates sub-mode special shortcuts
 		if m.active == 1 {
-			switch m.selectedNginxSubMode {
-			case 1: // VHosts Mode
-				switch msg.String() {
-				case "a": // Add vhost
-					m.editing = true
-					m.textInputPrompt = "Enter Virtual Host Domain Name:"
-					m.textInputState = "vhost_domain"
-					m.textInputValue = ""
-					return m, nil
-				case "d": // Delete vhost
-					if len(m.nginxVHosts) > 0 && m.selectedVHostIndex < len(m.nginxVHosts) {
-						domain := m.nginxVHosts[m.selectedVHostIndex]["domain"]
-						m.confirming = true
-						m.confirmPrompt = fmt.Sprintf("DANGER: Delete VHost for %s (websites files will not be deleted)?", domain)
-						m.confirmCallback = func() tea.Cmd {
-							svc := m.findRegistry("nginx")
-							return runAction(m.config, m.dockerClient, *svc, Action{ID: "vhost_del"}, map[string]string{
-								"domain":      domain,
-								"delete-root": "false",
-							})
-						}
-						return m, nil
-					}
-				}
-			case 2: // Certificates Mode
-				switch msg.String() {
-				case "a": // Apply SSL
-					m.editing = true
-					m.textInputPrompt = "Enter Domain Name for Let's Encrypt SSL:"
-					m.textInputState = "ssl_apply_domain"
-					m.textInputValue = ""
-					return m, nil
-				case "r": // Renew SSL
-					if len(m.nginxVHosts) > 0 && m.selectedCertIndex < len(m.nginxVHosts) {
-						domain := m.nginxVHosts[m.selectedCertIndex]["domain"]
-						m.drawerMode = drawerTasks
-						m.drawerContent = fmt.Sprintf("Renewing SSL for %s...", domain)
-						svc := m.findRegistry("nginx")
-						return m, runAction(m.config, m.dockerClient, *svc, Action{ID: "ssl_renew"}, map[string]string{
-							"domain": domain,
-						})
-					}
-				case "d": // Delete SSL
-					if len(m.nginxVHosts) > 0 && m.selectedCertIndex < len(m.nginxVHosts) {
-						domain := m.nginxVHosts[m.selectedCertIndex]["domain"]
-						m.confirming = true
-						m.confirmPrompt = fmt.Sprintf("DANGER: Delete SSL Certificate for %s?", domain)
-						m.confirmCallback = func() tea.Cmd {
-							svc := m.findRegistry("nginx")
-							return runAction(m.config, m.dockerClient, *svc, Action{ID: "ssl_delete"}, map[string]string{
-								"domain": domain,
-							})
-						}
-						return m, nil
-					}
-				}
-			}
+			return m.handleNginxSubModeShortcuts(msg)
 		}
 		return m, nil
 	}
 
+	return m.handleServiceActionShortcuts(msg, selectedSvc)
+}
+
+func (m *RootModel) handleDoctorShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == "r" {
+		m.doctorRunning = true
+		return m, m.runDiagnosticsCmd()
+	}
+	return m, nil
+}
+
+func (m *RootModel) handleConfigShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == "enter" {
+		if m.focus == focusSidebar {
+			m.focus = focusDetail
+			m.selectedConfigItem = 0
+			return m, nil
+		} else if m.focus == focusDetail {
+			cat := ConfigCategories[m.selectedConfigCategory]
+			if m.selectedConfigItem < len(cat.Keys) {
+				configKey := cat.Keys[m.selectedConfigItem]
+				m.editing = true
+				m.textInputPrompt = fmt.Sprintf("Enter new value for %s:", configKey)
+				m.textInputState = "config|" + configKey
+				m.textInputValue = m.config.GetString(configKey)
+				return m, nil
+			}
+		}
+	}
+	if msg.String() == "esc" {
+		if m.focus == focusDetail {
+			m.focus = focusSidebar
+			return m, nil
+		}
+	}
+	if msg.String() == "s" {
+		m.drawerMode = drawerTasks
+		m.drawerContent = "Saving configurations to configs/default.yaml..."
+		return m, func() tea.Msg {
+			var err error
+			if m.config != nil {
+				if m.config.ConfigFileUsed() != "" {
+					err = m.config.WriteConfig()
+				} else {
+					targetPath := fileutil.GetDefaultWriteConfigPath()
+					if errDir := fileutil.EnsureDir(filepath.Dir(targetPath), 0755); errDir == nil {
+						err = m.config.WriteConfigAs(targetPath)
+						if err == nil {
+							m.config.SetConfigFile(targetPath)
+						}
+					} else {
+						err = errDir
+					}
+				}
+			}
+			output := "Configuration successfully saved."
+			if err != nil {
+				output = fmt.Sprintf("Error saving configuration: %v", err)
+			}
+			return taskFinishedMsg{
+				ServiceName: "config",
+				ActionName:  "save",
+				Output:      output,
+				Err:         err,
+			}
+		}
+	}
+	return m, nil
+}
+
+func (m *RootModel) handleNginxSubModeShortcuts(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch m.selectedNginxSubMode {
+	case 1: // VHosts Mode
+		switch msg.String() {
+		case "a":
+			m.editing = true
+			m.textInputPrompt = "Enter Virtual Host Domain Name:"
+			m.textInputState = "vhost_domain"
+			m.textInputValue = ""
+			return m, nil
+		case "d":
+			if len(m.nginxVHosts) > 0 && m.selectedVHostIndex < len(m.nginxVHosts) {
+				domain := m.nginxVHosts[m.selectedVHostIndex]["domain"]
+				m.confirming = true
+				m.confirmPrompt = fmt.Sprintf("DANGER: Delete VHost for %s (websites files will not be deleted)?", domain)
+				m.confirmCallback = func() tea.Cmd {
+					svc := m.findRegistry("nginx")
+					return runAction(m.config, m.dockerClient, *svc, Action{ID: "vhost_del"}, map[string]string{
+						"domain":      domain,
+						"delete-root": "false",
+					})
+				}
+				return m, nil
+			}
+		}
+	case 2: // Certificates Mode
+		switch msg.String() {
+		case "a":
+			m.editing = true
+			m.textInputPrompt = "Enter Domain Name for Let's Encrypt SSL:"
+			m.textInputState = "ssl_apply_domain"
+			m.textInputValue = ""
+			return m, nil
+		case "r":
+			if len(m.nginxVHosts) > 0 && m.selectedCertIndex < len(m.nginxVHosts) {
+				domain := m.nginxVHosts[m.selectedCertIndex]["domain"]
+				m.drawerMode = drawerTasks
+				m.drawerContent = fmt.Sprintf("Renewing SSL for %s...", domain)
+				svc := m.findRegistry("nginx")
+				return m, runAction(m.config, m.dockerClient, *svc, Action{ID: "ssl_renew"}, map[string]string{
+					"domain": domain,
+				})
+			}
+		case "d":
+			if len(m.nginxVHosts) > 0 && m.selectedCertIndex < len(m.nginxVHosts) {
+				domain := m.nginxVHosts[m.selectedCertIndex]["domain"]
+				m.confirming = true
+				m.confirmPrompt = fmt.Sprintf("DANGER: Delete SSL Certificate for %s?", domain)
+				m.confirmCallback = func() tea.Cmd {
+					svc := m.findRegistry("nginx")
+					return runAction(m.config, m.dockerClient, *svc, Action{ID: "ssl_delete"}, map[string]string{
+						"domain": domain,
+					})
+				}
+				return m, nil
+			}
+		}
+	}
+	return m, nil
+}
+
+func (m *RootModel) handleServiceActionShortcuts(msg tea.KeyMsg, selectedSvc ServiceRef) (tea.Model, tea.Cmd) {
 	var actionID ActionID
 	switch msg.String() {
 	case "s":

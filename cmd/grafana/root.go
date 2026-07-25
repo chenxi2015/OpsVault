@@ -1,6 +1,8 @@
 package grafana
 
 import (
+	"OpsVault/cmd/common"
+	"OpsVault/internal/driver"
 	"OpsVault/internal/driver/docker"
 
 	"github.com/docker/docker/client"
@@ -16,15 +18,20 @@ type commandSet struct {
 // NewCommand creates and returns a new cobra.Command for Grafana service management
 func NewCommand(cfg *viper.Viper, dockerFactory func() (*client.Client, error)) *cobra.Command {
 	c := &commandSet{config: cfg, dockerFactory: dockerFactory}
+	getMode := func() string { return cfg.GetString("mode") }
+	getDriver := func() (driver.ServiceDriver, error) {
+		return c.driver("")
+	}
+
 	cmd := &cobra.Command{Use: "grafana", Short: "Manage Grafana dashboard server"}
 	cmd.AddCommand(
 		c.newInstallCommand(),
-		c.newStartCommand(),
-		c.newStopCommand(),
-		c.newRestartCommand(),
-		c.newUninstallCommand(),
+		common.NewStartCmd("Grafana", getMode, getDriver),
+		common.NewStopCmd("Grafana", getMode, getDriver),
+		common.NewRestartCmd("Grafana", getMode, getDriver),
+		common.NewUninstallCmd("Grafana", getMode, getDriver),
 		c.newUpgradeCommand(),
-		c.newStatusCommand(),
+		common.NewStatusCmd("Grafana", getMode, getDriver),
 		c.newLogCommand(),
 	)
 	return cmd

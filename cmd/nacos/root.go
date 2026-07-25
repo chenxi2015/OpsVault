@@ -1,6 +1,8 @@
 package nacos
 
 import (
+	"OpsVault/cmd/common"
+	"OpsVault/internal/driver"
 	"OpsVault/internal/driver/docker"
 
 	"github.com/docker/docker/client"
@@ -16,15 +18,20 @@ type commandSet struct {
 // NewCommand creates and returns a new cobra.Command for Nacos service management
 func NewCommand(cfg *viper.Viper, dockerFactory func() (*client.Client, error)) *cobra.Command {
 	c := &commandSet{config: cfg, dockerFactory: dockerFactory}
+	getMode := func() string { return cfg.GetString("mode") }
+	getDriver := func() (driver.ServiceDriver, error) {
+		return c.driver("")
+	}
+
 	cmd := &cobra.Command{Use: "nacos", Short: "Manage Nacos"}
 	cmd.AddCommand(
 		c.newInstallCommand(),
-		c.newStartCommand(),
-		c.newStopCommand(),
-		c.newRestartCommand(),
-		c.newUninstallCommand(),
+		common.NewStartCmd("Nacos", getMode, getDriver),
+		common.NewStopCmd("Nacos", getMode, getDriver),
+		common.NewRestartCmd("Nacos", getMode, getDriver),
+		common.NewUninstallCmd("Nacos", getMode, getDriver),
 		c.newUpgradeCommand(),
-		c.newStatusCommand(),
+		common.NewStatusCmd("Nacos", getMode, getDriver),
 		c.newLogCommand(),
 	)
 	return cmd

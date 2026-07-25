@@ -1,6 +1,8 @@
 package mysql
 
 import (
+	"OpsVault/cmd/common"
+	"OpsVault/internal/driver"
 	"OpsVault/internal/driver/docker"
 
 	"github.com/docker/docker/client"
@@ -15,18 +17,23 @@ type commandSet struct {
 
 func NewCommand(cfg *viper.Viper, dockerFactory func() (*client.Client, error)) *cobra.Command {
 	c := &commandSet{config: cfg, dockerFactory: dockerFactory}
+	getMode := func() string { return cfg.GetString("mode") }
+	getDriver := func() (driver.ServiceDriver, error) {
+		return c.driver("")
+	}
+
 	cmd := &cobra.Command{
 		Use:   "mysql",
 		Short: "Manage MySQL",
 	}
 	cmd.AddCommand(
 		c.newInstallCommand(),
-		c.newStartCommand(),
-		c.newStopCommand(),
-		c.newRestartCommand(),
-		c.newUninstallCommand(),
+		common.NewStartCmd("MySQL", getMode, getDriver),
+		common.NewStopCmd("MySQL", getMode, getDriver),
+		common.NewRestartCmd("MySQL", getMode, getDriver),
+		common.NewUninstallCmd("MySQL", getMode, getDriver),
 		c.newUpgradeCommand(),
-		c.newStatusCommand(),
+		common.NewStatusCmd("MySQL", getMode, getDriver),
 		c.newLogCommand(),
 		c.newExecCommand(),
 	)

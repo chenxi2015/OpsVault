@@ -22,13 +22,20 @@ OpsVault 是一个面向 CentOS 7 / CentOS Stream 的运维工具箱，提供：
   - `opsvault tui`
   - `opsvault init` (一键初始化与服务选择安装)
   - `opsvault doctor` (系统与运行环境体检诊断)
-  - `opsvault nginx ...`
+  - `opsvault nginx ...` (Nginx 二进制编译与 vhost/SSL 管理)
   - `opsvault mysql ...`
   - `opsvault redis ...`
   - `opsvault rocketmq ...`
   - `opsvault rabbitmq ...`
   - `opsvault postgres ...`
   - `opsvault minio ...` (MinIO 对象存储管理，内置 Console)
+  - `opsvault prometheus ...` (Prometheus 监控服务)
+  - `opsvault grafana ...` (Grafana 监控看板)
+  - `opsvault node-exporter ...` (Node Exporter 系统指标采集)
+  - `opsvault nacos ...` (Nacos 注册与配置中心)
+  - `opsvault elk ...` (ELK 堆栈)
+  - `opsvault gitlab ...` (GitLab 代码托管)
+  - `opsvault jenkins ...` (Jenkins CI/CD)
   - `opsvault bak ...` (配置备份与恢复)
   - `opsvault ansible ...` (多机批量连接、巡检、自动化部署、二进制分发与服务回收)
 - 全局配置加载与默认配置模板
@@ -125,6 +132,13 @@ opsvault nginx ssl apply --domain api.example.com
 go test ./...
 go build ./...
 ```
+
+## 核心架构设计亮点
+
+- **统一驱动接口 (`driver.ServiceDriver`)**：严格定义标准组件生命周期（Install / Start / Stop / Restart / Uninstall / Upgrade / Status）通用接口，命令层与驱动层解耦。
+- **CLI 工厂模式 (`cmd/common/factory.go`)**：全量 12 个中间件通过通用的命令工厂挂载 `start / stop / restart / status / log / uninstall` 子命令，极大降低了模版代码冗余与维护成本。
+- **Docker 专属网桥与持久化**：所有 Docker 驱动中间件统一接入专属网桥 `opsvault-net` (`172.28.0.0/16`)，宿主机持久化目录统一规范存放在 `/data/opsvault/`。
+- **Nginx Binary 驱动内建编排**：由 OpsVault Go 源码内建编排下载 Nginx/PCRE/OpenSSL 源码并编译，自动注册 Systemd 服务与 Logrotate。
 
 ## 说明
 

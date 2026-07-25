@@ -1,6 +1,8 @@
 package rabbitmq
 
 import (
+	"OpsVault/cmd/common"
+	"OpsVault/internal/driver"
 	"OpsVault/internal/driver/docker"
 
 	"github.com/docker/docker/client"
@@ -15,15 +17,20 @@ type commandSet struct {
 
 func NewCommand(cfg *viper.Viper, dockerFactory func() (*client.Client, error)) *cobra.Command {
 	c := &commandSet{config: cfg, dockerFactory: dockerFactory}
+	getMode := func() string { return cfg.GetString("mode") }
+	getDriver := func() (driver.ServiceDriver, error) {
+		return c.driver("", "")
+	}
+
 	cmd := &cobra.Command{Use: "rabbitmq", Short: "Manage RabbitMQ"}
 	cmd.AddCommand(
 		c.newInstallCommand(),
-		c.newStartCommand(),
-		c.newStopCommand(),
-		c.newRestartCommand(),
-		c.newUninstallCommand(),
+		common.NewStartCmd("RabbitMQ", getMode, getDriver),
+		common.NewStopCmd("RabbitMQ", getMode, getDriver),
+		common.NewRestartCmd("RabbitMQ", getMode, getDriver),
+		common.NewUninstallCmd("RabbitMQ", getMode, getDriver),
 		c.newUpgradeCommand(),
-		c.newStatusCommand(),
+		common.NewStatusCmd("RabbitMQ", getMode, getDriver),
 	)
 	return cmd
 }
