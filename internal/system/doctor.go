@@ -287,6 +287,9 @@ func checkPorts(config *viper.Viper) DiagnosticItem {
 		{Service: "Nacos 控制台", ConfigKey: "nacos.port", Default: 8848},
 		{Service: "Nacos gRPC 客户端", ConfigKey: "nacos.grpc_port_1", Default: 9848},
 		{Service: "Nacos gRPC 集群", ConfigKey: "nacos.grpc_port_2", Default: 9849},
+		{Service: "Prometheus 监控", ConfigKey: "prometheus.port", Default: 9090},
+		{Service: "Grafana 看板", ConfigKey: "grafana.port", Default: 3000},
+		{Service: "Node Exporter", ConfigKey: "node_exporter.port", Default: 9100},
 	}
 
 	type Row struct {
