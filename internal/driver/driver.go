@@ -10,6 +10,7 @@ type Mode string
 const (
 	ModeDocker Mode = "docker"
 	ModeBinary Mode = "binary"
+	ModeK8s    Mode = "k8s"
 )
 
 type ServiceStatus struct {
@@ -66,3 +67,9 @@ type Migrator interface {
 	MigrateHost(targetHost string, syncData bool) error
 	MigrateEngine(targetMode Mode) error
 }
+
+type K8sRegisterer interface {
+	RegisterK8sService(namespace string, targetIP string, targetPort int) error
+	UnregisterK8sService(namespace string) error
+}
+

@@ -13,6 +13,7 @@ import (
 	"OpsVault/cmd/gitlab"
 	"OpsVault/cmd/grafana"
 	"OpsVault/cmd/jenkins"
+	k8scmd "OpsVault/cmd/k8s"
 	"OpsVault/cmd/minio"
 	"OpsVault/cmd/mysql"
 	"OpsVault/cmd/nacos"
@@ -117,6 +118,7 @@ func init() {
 	rootCmd.AddCommand(newBakCommand(config))
 	rootCmd.AddCommand(newMigrateCommand(config))
 	rootCmd.AddCommand(ansiblecmd.NewCommand(config))
+	rootCmd.AddCommand(k8scmd.K8sCmd)
 }
 
 func initConfig() error {

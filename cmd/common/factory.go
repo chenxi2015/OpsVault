@@ -27,7 +27,7 @@ func NewStartCmd(serviceName string, getMode func() string, getDriver DriverProv
 		Use:   "start",
 		Short: fmt.Sprintf("Start %s service", serviceName),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := RequireMode(driver.Mode(getMode()), driver.ModeDocker, driver.ModeBinary); err != nil {
+			if err := RequireMode(driver.Mode(getMode()), driver.ModeDocker, driver.ModeBinary, driver.ModeK8s); err != nil {
 				return err
 			}
 			drv, err := getDriver()
@@ -45,7 +45,7 @@ func NewStopCmd(serviceName string, getMode func() string, getDriver DriverProvi
 		Use:   "stop",
 		Short: fmt.Sprintf("Stop %s service", serviceName),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := RequireMode(driver.Mode(getMode()), driver.ModeDocker, driver.ModeBinary); err != nil {
+			if err := RequireMode(driver.Mode(getMode()), driver.ModeDocker, driver.ModeBinary, driver.ModeK8s); err != nil {
 				return err
 			}
 			drv, err := getDriver()
@@ -63,7 +63,7 @@ func NewRestartCmd(serviceName string, getMode func() string, getDriver DriverPr
 		Use:   "restart",
 		Short: fmt.Sprintf("Restart %s service", serviceName),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := RequireMode(driver.Mode(getMode()), driver.ModeDocker, driver.ModeBinary); err != nil {
+			if err := RequireMode(driver.Mode(getMode()), driver.ModeDocker, driver.ModeBinary, driver.ModeK8s); err != nil {
 				return err
 			}
 			drv, err := getDriver()
@@ -81,7 +81,7 @@ func NewStatusCmd(serviceName string, getMode func() string, getDriver DriverPro
 		Use:   "status",
 		Short: fmt.Sprintf("Check %s service status", serviceName),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := RequireMode(driver.Mode(getMode()), driver.ModeDocker, driver.ModeBinary); err != nil {
+			if err := RequireMode(driver.Mode(getMode()), driver.ModeDocker, driver.ModeBinary, driver.ModeK8s); err != nil {
 				return err
 			}
 			drv, err := getDriver()
@@ -106,7 +106,7 @@ func NewLogCmd(serviceName string, getMode func() string, getLogDriver LogDriver
 		Use:   "log",
 		Short: fmt.Sprintf("View %s service logs", serviceName),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := RequireMode(driver.Mode(getMode()), driver.ModeDocker, driver.ModeBinary); err != nil {
+			if err := RequireMode(driver.Mode(getMode()), driver.ModeDocker, driver.ModeBinary, driver.ModeK8s); err != nil {
 				return err
 			}
 			drv, err := getLogDriver()
@@ -128,7 +128,7 @@ func NewUninstallCmd(serviceName string, getMode func() string, getDriver Driver
 		Use:   "uninstall",
 		Short: fmt.Sprintf("Uninstall %s service", serviceName),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := RequireMode(driver.Mode(getMode()), driver.ModeDocker, driver.ModeBinary); err != nil {
+			if err := RequireMode(driver.Mode(getMode()), driver.ModeDocker, driver.ModeBinary, driver.ModeK8s); err != nil {
 				return err
 			}
 			drv, err := getDriver()
