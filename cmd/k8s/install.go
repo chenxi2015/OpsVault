@@ -3,20 +3,21 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	k8sdriver "OpsVault/internal/driver/k8s"
 	"OpsVault/pkg/dockercli"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
-	installEngine  string
-	installMode    string
-	installVersion string
-	installDataDir string
+	installEngine    string
+	installMode      string
+	installVersion   string
+	installDataDir   string
+	installScriptURL string
 )
 
 var installCmd = &cobra.Command{
@@ -27,14 +28,26 @@ var installCmd = &cobra.Command{
 		successStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("82"))
 		highlightStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("99"))
 
-		if !cmd.Flags().Changed("engine") && viper.GetString("k8s.engine") != "" {
-			installEngine = viper.GetString("k8s.engine")
+		cfg := getConfig()
+		if !cmd.Flags().Changed("engine") && cfg.GetString("k8s.engine") != "" {
+			installEngine = cfg.GetString("k8s.engine")
 		}
-		if !cmd.Flags().Changed("version") && viper.GetString("k8s.version") != "" {
-			installVersion = viper.GetString("k8s.version")
+		if !cmd.Flags().Changed("version") && cfg.GetString("k8s.version") != "" {
+			installVersion = cfg.GetString("k8s.version")
 		}
-		if !cmd.Flags().Changed("data-dir") && viper.GetString("k8s.data_dir") != "" {
-			installDataDir = viper.GetString("k8s.data_dir")
+		if !cmd.Flags().Changed("install-script-url") && cfg.GetString("k8s.install_script_url") != "" {
+			installScriptURL = cfg.GetString("k8s.install_script_url")
+		}
+		if !cmd.Flags().Changed("data-dir") {
+			if cfg.GetString("k8s.data_dir") != "" {
+				installDataDir = cfg.GetString("k8s.data_dir")
+			} else {
+				rootDir := cfg.GetString("system.root_dir")
+				if rootDir == "" {
+					rootDir = "/data/opsvault"
+				}
+				installDataDir = filepath.Join(rootDir, k8sdriver.DefaultK3sDataSuffix)
+			}
 		}
 
 		engineDesc := installEngine
@@ -58,7 +71,7 @@ var installCmd = &cobra.Command{
 
 		ctx := context.Background()
 
-		err := k8sdriver.InstallCluster(ctx, cli, installEngine, installMode, installVersion, installDataDir)
+		err := k8sdriver.InstallCluster(ctx, cli, installEngine, installMode, installVersion, installDataDir, installScriptURL)
 		if err != nil {
 			return err
 		}
@@ -79,7 +92,8 @@ func init() {
 	installCmd.Flags().StringVar(&installEngine, "engine", "k3s", "集群部署引擎: k3s (轻量级认证版) | kubeadm (标准原生版) | k0s")
 	installCmd.Flags().StringVar(&installMode, "mode", "binary", "安装运行模式: binary (系统服务) | docker (容器模式)")
 	installCmd.Flags().StringVar(&installVersion, "version", k8sdriver.DefaultK3sVersion, "Kubernetes / K3s 集群版本")
-	installCmd.Flags().StringVar(&installDataDir, "data-dir", k8sdriver.DefaultK3sDataDir, "宿主机持久化数据根目录")
+	installCmd.Flags().StringVar(&installDataDir, "data-dir", "", "宿主机持久化数据根目录（留空则自动使用 {system.root_dir}/k3s）")
+	installCmd.Flags().StringVar(&installScriptURL, "install-script-url", "", "K3s 二进制安装脚本下载 URL（留空则优先使用 k8s.install_script_url 配置）")
 
 	K8sCmd.AddCommand(installCmd)
 }

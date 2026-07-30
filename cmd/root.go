@@ -118,7 +118,7 @@ func init() {
 	rootCmd.AddCommand(newBakCommand(config))
 	rootCmd.AddCommand(newMigrateCommand(config))
 	rootCmd.AddCommand(ansiblecmd.NewCommand(config))
-	rootCmd.AddCommand(k8scmd.K8sCmd)
+	rootCmd.AddCommand(k8scmd.NewCommand(config))
 }
 
 func initConfig() error {
@@ -230,6 +230,8 @@ func applyDefaultConfig(v *viper.Viper) {
 	v.SetDefault("gitlab.port", 8082)
 	v.SetDefault("gitlab.ssh_port", 2222)
 	v.SetDefault("gitlab.https_port", 8443)
+	v.SetDefault("gitlab.puma_workers", 2)
+	v.SetDefault("gitlab.external_url", "")
 	v.SetDefault("minio.image", "minio/minio:RELEASE.2024-05-10T01-39-39Z")
 	v.SetDefault("minio.port", 9000)
 	v.SetDefault("minio.console_port", 9001)
@@ -276,6 +278,22 @@ func resolveFallbackPaths(v *viper.Viper) {
 
 	if v.GetString("docker.data_root") == "" {
 		v.Set("docker.data_root", rootDir)
+	}
+
+	// k8s.data_dir: 留空时自动派生为 {root_dir}/k3s
+	if v.GetString("k8s.data_dir") == "" {
+		v.Set("k8s.data_dir", filepath.Join(rootDir, "k3s"))
+	}
+
+	// nginx 相关数据路径: 留空时自动派生自 root_dir
+	if v.GetString("nginx.ssl_root") == "" {
+		v.Set("nginx.ssl_root", filepath.Join(rootDir, "ssl"))
+	}
+	if v.GetString("nginx.data_root") == "" {
+		v.Set("nginx.data_root", filepath.Join(rootDir, "dataroot"))
+	}
+	if v.GetString("nginx.datalogs_root") == "" {
+		v.Set("nginx.datalogs_root", filepath.Join(rootDir, "datalogs"))
 	}
 
 	backupPath := v.GetString("backup.storage_path")

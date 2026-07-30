@@ -5,7 +5,23 @@ import (
 	"github.com/spf13/viper"
 )
 
-var KubeConfigPath string
+var (
+	KubeConfigPath string
+	appConfig      *viper.Viper
+)
+
+// NewCommand creates and returns a new cobra.Command for k8s management
+func NewCommand(cfg *viper.Viper) *cobra.Command {
+	appConfig = cfg
+	return K8sCmd
+}
+
+func getConfig() *viper.Viper {
+	if appConfig != nil {
+		return appConfig
+	}
+	return viper.GetViper()
+}
 
 // K8sCmd represents the k8s parent command
 var K8sCmd = &cobra.Command{
@@ -14,7 +30,10 @@ var K8sCmd = &cobra.Command{
 	Long:  `opsvault k8s 命令集提供 K8s 集群状态检查、Pods/Nodes 诊断、日志流调取以及外部 Docker 服务注册绑定功能。`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if KubeConfigPath == "" {
-			KubeConfigPath = viper.GetString("k8s.kubeconfig")
+			cfg := getConfig()
+			if cfg != nil {
+				KubeConfigPath = cfg.GetString("k8s.kubeconfig")
+			}
 		}
 	},
 }
@@ -22,3 +41,4 @@ var K8sCmd = &cobra.Command{
 func init() {
 	K8sCmd.PersistentFlags().StringVar(&KubeConfigPath, "kubeconfig", "", "指定 kubeconfig 配置文件路径 (默认读取 ~/.kube/config 或 $KUBECONFIG)")
 }
+

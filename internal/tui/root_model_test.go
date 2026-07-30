@@ -8,6 +8,7 @@ import (
 	"OpsVault/internal/driver"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/spf13/viper"
 )
 
 func TestRootModelTickRefreshesStatuses(t *testing.T) {
@@ -176,3 +177,44 @@ func TestRootModelConfigTab(t *testing.T) {
 		t.Errorf("expected Esc on details to change focus back to focusSidebar, got %v", root.focus)
 	}
 }
+
+func TestGitLabConfigKeysAndInput(t *testing.T) {
+	var gitlabCat *ConfigCategory
+	for i := range ConfigCategories {
+		if ConfigCategories[i].Name == "GitLab" {
+			gitlabCat = &ConfigCategories[i]
+			break
+		}
+	}
+	if gitlabCat == nil {
+		t.Fatalf("GitLab category not found in ConfigCategories")
+	}
+
+	hasPumaWorkers := false
+	hasExternalURL := false
+	for _, k := range gitlabCat.Keys {
+		if k == "gitlab.puma_workers" {
+			hasPumaWorkers = true
+		}
+		if k == "gitlab.external_url" {
+			hasExternalURL = true
+		}
+	}
+	if !hasPumaWorkers {
+		t.Errorf("expected gitlab.puma_workers in GitLab category keys")
+	}
+	if !hasExternalURL {
+		t.Errorf("expected gitlab.external_url in GitLab category keys")
+	}
+
+	model := NewRootModel(StaticStatusProvider{})
+	model.config = viper.New()
+	model.textInputState = "config|gitlab.puma_workers"
+	model.textInputValue = "4"
+	model.handleInputSubmit()
+
+	if model.config.GetInt("gitlab.puma_workers") != 4 {
+		t.Errorf("expected gitlab.puma_workers to be 4, got %v", model.config.Get("gitlab.puma_workers"))
+	}
+}
+

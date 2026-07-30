@@ -111,6 +111,10 @@ func (d *GitLabDriver) prepareConfig(confDir string) error {
 	if port == 0 {
 		port = 8082
 	}
+	sshPort := d.Config.GetInt("gitlab.ssh_port")
+	if sshPort == 0 {
+		sshPort = 2222
+	}
 	extURL := d.Config.GetString("gitlab.external_url")
 	if extURL == "" {
 		extURL = fmt.Sprintf("http://localhost:%d", port)
@@ -126,7 +130,8 @@ external_url '%s'
 nginx['listen_port'] = 80
 puma['worker_processes'] = %d
 puma['per_worker_max_memory_mb'] = 1024
-`, extURL, pumaWorkers)
+gitlab_rails['gitlab_shell_ssh_port'] = %d
+`, extURL, pumaWorkers, sshPort)
 		if err := os.WriteFile(rbFile, []byte(content), 0o644); err != nil {
 			return fmt.Errorf("failed to write gitlab.rb: %w", err)
 		}
@@ -140,6 +145,9 @@ puma['per_worker_max_memory_mb'] = 1024
 			}
 			if !strings.Contains(contentStr, "puma['worker_processes']") {
 				toAppend = append(toAppend, fmt.Sprintf("puma['worker_processes'] = %d", pumaWorkers))
+			}
+			if !strings.Contains(contentStr, "gitlab_shell_ssh_port") {
+				toAppend = append(toAppend, fmt.Sprintf("gitlab_rails['gitlab_shell_ssh_port'] = %d", sshPort))
 			}
 			if len(toAppend) > 0 {
 				newContent := contentStr + "\n# Appended by OpsVault optimization\n" + strings.Join(toAppend, "\n") + "\n"

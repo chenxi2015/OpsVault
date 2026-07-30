@@ -71,6 +71,7 @@ func TestGitLabPrepareConfig(t *testing.T) {
 
 	cfg := testConfigWithRoot(tempDir)
 	cfg.Set("gitlab.port", 8082)
+	cfg.Set("gitlab.ssh_port", 2222)
 	cfg.Set("gitlab.puma_workers", 2)
 
 	drv := NewGitLabDriver(WrapClient(nil), cfg)
@@ -90,5 +91,8 @@ func TestGitLabPrepareConfig(t *testing.T) {
 	}
 	if !strings.Contains(content, "puma['worker_processes'] = 2") {
 		t.Errorf("expected gitlab.rb to set puma worker_processes to 2, got:\n%s", content)
+	}
+	if !strings.Contains(content, "gitlab_rails['gitlab_shell_ssh_port'] = 2222") {
+		t.Errorf("expected gitlab.rb to set gitlab_shell_ssh_port to 2222, got:\n%s", content)
 	}
 }

@@ -63,6 +63,43 @@ opsvault --config /path/to/config.yaml mysql status
 - 如果 `default.yaml` 中相关服务的密码项被配置为空（例如 `mysql.root_password: ""`、`redis.password: ""`、`postgres.password: ""`、`rabbitmq.admin_pwd: ""` 或 `minio.root_password: ""`），且在 CLI 或 TUI 安装时未额外指定自定义密码参数，系统将**自动生成一个 20 位的强随机密码**。
 - 生成的随机密码会**自动持久化写回配置文件**中。这确保了后续查看状态 (`status`)、读取凭证 (`credentials`)、重启或容器重建等操作对密码读取的一致性。
 
+### GitLab 初始密码查看与重置指南
+
+针对 GitLab 的凭证与密码管理：
+
+1. **查看初始 root 密码**（仅适用于首次安装 24 小时内未修改密码）：
+   - **通过 OpsVault 凭证查询命令**：
+     ```bash
+     opsvault gitlab status
+     ```
+   - **通过 Docker 命令行直接读取**：
+     ```bash
+     docker exec -it gitlab cat /etc/gitlab/initial_root_password
+     ```
+   - **通过宿主机挂载文件读取**（默认位于 `/data/opsvault/gitlab/config/initial_root_password`）：
+     ```bash
+     cat /data/opsvault/gitlab/config/initial_root_password
+     ```
+
+2. **忘记密码或密码已修改时的重置命令（无需重新安装）**：
+   - 运行命令行一键重置 root 密码：
+     ```bash
+     docker exec -it gitlab gitlab-rake "gitlab:password:reset[root]"
+     ```
+   - 或进入 GitLab Rails 控制台手动重置：
+     ```bash
+     docker exec -it gitlab gitlab-rails console -e production
+     # 交互控制台中执行:
+     # user = User.find_by(username: 'root')
+     # user.password = 'YourNewPassword123'
+     # user.password_confirmation = 'YourNewPassword123'
+     # user.save!
+     ```
+
+> [!NOTE]
+> **安全最佳实践**：无需也不建议将用户登录密码硬编码在 `default.yaml` 配置文件中或写入 `audit.log` 审计日志中。初始密码存在系统临时凭据文件中，修改后的密码由 GitLab 内部数据库加密存储，忘记密码可随时通过上述命令重置。
+
+
 ## 配置备份与恢复 (bak)
 
 `opsvault bak` 子命令用于备份和恢复各中间件服务的配置文件（如 MySQL 的 `my.cnf`、Redis 的 `redis.conf`、Nginx 的 `conf/` 目录等）以及全局 `default.yaml` 配置文件。

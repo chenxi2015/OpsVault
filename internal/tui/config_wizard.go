@@ -130,6 +130,8 @@ var ConfigCategories = []ConfigCategory{
 			"gitlab.port",
 			"gitlab.ssh_port",
 			"gitlab.https_port",
+			"gitlab.puma_workers",
+			"gitlab.external_url",
 		},
 	},
 	{
@@ -153,6 +155,18 @@ var ConfigCategories = []ConfigCategory{
 		Keys: []string{
 			"node_exporter.image",
 			"node_exporter.port",
+		},
+	},
+	{
+		Name: "Kubernetes (K8s)",
+		Keys: []string{
+			"k8s.kubeconfig",
+			"k8s.namespace",
+			"k8s.engine",
+			"k8s.version",
+			"k8s.data_dir",
+			"k8s.dashboard.type",
+			"k8s.dashboard.port",
 		},
 	},
 	{
@@ -206,6 +220,12 @@ var ConfigKeys = []string{
 	"elk.logstash_image",
 	"elk.logstash_port",
 	"elk.es_java_opts",
+	"gitlab.image",
+	"gitlab.port",
+	"gitlab.ssh_port",
+	"gitlab.https_port",
+	"gitlab.puma_workers",
+	"gitlab.external_url",
 }
 
 // ConfigWizardView renders the config options list with categories on left and params on right.

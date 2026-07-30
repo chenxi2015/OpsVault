@@ -26,15 +26,15 @@ import (
 )
 
 const (
-	DefaultK3sVersion   = "v1.31.2+k3s1"
-	DefaultK3sDataDir   = "/data/opsvault/k3s"
-	DefaultKuboardPort  = 30080
-	K3sContainerName    = "opsvault-k3s"
-	K3sInstallScriptURL = "https://get.k3s.io"
+	DefaultK3sVersion          = "v1.31.2+k3s1"
+	DefaultK3sDataSuffix       = "k3s" // 子目录名称，运行时拼接到 system.root_dir 下
+	DefaultKuboardPort         = 30080
+	K3sContainerName           = "opsvault-k3s"
+	DefaultK3sInstallScriptURL = "https://rancher-mirror.rancher.cn/k3s/k3s-install.sh"
 )
 
 // InstallCluster is the unified entry point for cluster installation using specified engine (k3s, kubeadm, k0s).
-func InstallCluster(ctx context.Context, cli *client.Client, engine, mode, version, dataDir string) error {
+func InstallCluster(ctx context.Context, cli *client.Client, engine, mode, version, dataDir, installScriptURL string) error {
 	switch strings.ToLower(engine) {
 	case "k3s", "":
 		if mode == "docker" {
@@ -43,7 +43,7 @@ func InstallCluster(ctx context.Context, cli *client.Client, engine, mode, versi
 			}
 			return InstallK3sDocker(ctx, cli, version, dataDir)
 		}
-		return InstallK3sBinary(version, dataDir)
+		return InstallK3sBinary(version, dataDir, installScriptURL)
 
 	case "kubeadm":
 		return InstallKubeadmNative(ctx, version, dataDir)
@@ -65,12 +65,15 @@ func InstallKubeadmNative(ctx context.Context, version, dataDir string) error {
 }
 
 // InstallK3sBinary installs K3s as a native systemd service on Linux.
-func InstallK3sBinary(version string, dataDir string) error {
+func InstallK3sBinary(version string, dataDir string, installScriptURL string) error {
 	if version == "" {
 		version = DefaultK3sVersion
 	}
 	if dataDir == "" {
-		dataDir = DefaultK3sDataDir
+		dataDir = filepath.Join("/data/opsvault", DefaultK3sDataSuffix)
+	}
+	if installScriptURL == "" {
+		installScriptURL = DefaultK3sInstallScriptURL
 	}
 
 	_ = os.MkdirAll(dataDir, 0755)
@@ -79,10 +82,19 @@ func InstallK3sBinary(version string, dataDir string) error {
 	_ = exec.Command("sysctl", "-w", "net.ipv4.ip_forward=1").Run()
 	_ = exec.Command("sysctl", "-w", "net.bridge.bridge-nf-call-iptables=1").Run()
 
-	// 2. Fetch and run installation script
-	fmt.Println("🚀 正在下载并安装 K3s 二进制与服务 (系统模式)...")
-	cmdStr := fmt.Sprintf("curl -sfL %s | INSTALL_K3S_VERSION='%s' K3S_DATA_DIR='%s' sh -s - --write-kubeconfig-mode 644",
-		K3sInstallScriptURL, version, dataDir)
+	// 2. Fetch and run installation script with configured script URL
+	if _, err := os.Stat("/usr/local/bin/k3s"); err == nil {
+		fmt.Println("💡 检测到宿主机已存在 /usr/local/bin/k3s 二进制文件，将自动复用并跳过下载...")
+	}
+	fmt.Printf("🚀 正在初始化安装 K3s 二进制与服务 (安装脚本源: %s)...\n", installScriptURL)
+
+	var envMirror string
+	if strings.Contains(installScriptURL, "rancher-mirror") {
+		envMirror = "INSTALL_K3S_MIRROR=cn "
+	}
+
+	cmdStr := fmt.Sprintf("curl -sfL %s | %sINSTALL_K3S_VERSION='%s' K3S_DATA_DIR='%s' sh -s - --write-kubeconfig-mode 644",
+		installScriptURL, envMirror, version, dataDir)
 
 	cmd := exec.Command("bash", "-c", cmdStr)
 	cmd.Stdout = os.Stdout
@@ -115,7 +127,7 @@ func InstallK3sDocker(ctx context.Context, cli *client.Client, version string, d
 		version = DefaultK3sVersion
 	}
 	if dataDir == "" {
-		dataDir = DefaultK3sDataDir
+		dataDir = filepath.Join("/data/opsvault", DefaultK3sDataSuffix)
 	}
 
 	_ = os.MkdirAll(dataDir, 0755)
@@ -182,7 +194,7 @@ func InstallK3sDocker(ctx context.Context, cli *client.Client, version string, d
 }
 
 // UninstallK3s uninstalls K3s cluster and cleans up resources.
-func UninstallK3s(ctx context.Context, cli *client.Client, mode string, purge bool) error {
+func UninstallK3s(ctx context.Context, cli *client.Client, mode string, purge bool, dataDir string) error {
 	if mode == "docker" {
 		if cli != nil {
 			_ = cli.ContainerStop(ctx, K3sContainerName, container.StopOptions{})
@@ -204,7 +216,9 @@ func UninstallK3s(ctx context.Context, cli *client.Client, mode string, purge bo
 	}
 
 	if purge {
-		_ = os.RemoveAll(DefaultK3sDataDir)
+		if dataDir != "" {
+			_ = os.RemoveAll(dataDir)
+		}
 		homeDir, err := os.UserHomeDir()
 		if err == nil {
 			_ = os.Remove(filepath.Join(homeDir, ".kube", "config"))

@@ -438,7 +438,7 @@ func (m *RootModel) handleInputSubmit() (tea.Model, tea.Cmd) {
 	if strings.HasPrefix(m.textInputState, "config|") {
 		configKey := strings.TrimPrefix(m.textInputState, "config|")
 		if m.config != nil {
-			if strings.Contains(configKey, "port") {
+			if strings.Contains(configKey, "port") || strings.HasSuffix(configKey, "_workers") || configKey == "gitlab.puma_workers" {
 				if intVal, err := strconv.Atoi(val); err == nil {
 					m.config.Set(configKey, intVal)
 				} else {

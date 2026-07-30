@@ -7,7 +7,6 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -19,11 +18,12 @@ var dashboardCmd = &cobra.Command{
 	Use:   "dashboard",
 	Short: "一键向 K8s 集群部署图形化 Web 控制面板 (例如: Kuboard v3)",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if !cmd.Flags().Changed("type") && viper.GetString("k8s.dashboard.type") != "" {
-			dashboardType = viper.GetString("k8s.dashboard.type")
+		cfg := getConfig()
+		if !cmd.Flags().Changed("type") && cfg.GetString("k8s.dashboard.type") != "" {
+			dashboardType = cfg.GetString("k8s.dashboard.type")
 		}
-		if !cmd.Flags().Changed("port") && viper.GetInt("k8s.dashboard.port") > 0 {
-			dashboardPort = viper.GetInt("k8s.dashboard.port")
+		if !cmd.Flags().Changed("port") && cfg.GetInt("k8s.dashboard.port") > 0 {
+			dashboardPort = cfg.GetInt("k8s.dashboard.port")
 		}
 
 		titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("86"))

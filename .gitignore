@@ -13,3 +13,4 @@ configs/default.yaml
 ansible_tmp/
 opsvault_data/ansible/tmp
 opsvault_data/logs
+configs/*.pem

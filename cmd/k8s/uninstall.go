@@ -3,6 +3,7 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	k8sdriver "OpsVault/internal/driver/k8s"
 	"OpsVault/pkg/dockercli"
@@ -30,7 +31,17 @@ var uninstallCmd = &cobra.Command{
 			defer cli.Close()
 		}
 
-		err := k8sdriver.UninstallK3s(context.Background(), cli, uninstallMode, uninstallPurge)
+		cfg := getConfig()
+		dataDir := cfg.GetString("k8s.data_dir")
+		if dataDir == "" {
+			rootDir := cfg.GetString("system.root_dir")
+			if rootDir == "" {
+				rootDir = "/data/opsvault"
+			}
+			dataDir = filepath.Join(rootDir, k8sdriver.DefaultK3sDataSuffix)
+		}
+
+		err := k8sdriver.UninstallK3s(context.Background(), cli, uninstallMode, uninstallPurge, dataDir)
 		if err != nil {
 			return fmt.Errorf("卸载 K3s 失败: %w", err)
 		}
