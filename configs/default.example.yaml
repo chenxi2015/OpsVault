@@ -81,6 +81,8 @@ gitlab:
   port: 8082  # 映射到宿主机的 GitLab Web (HTTP) 端口
   ssh_port: 2222  # 映射到宿主机的 GitLab SSH 端口
   https_port: 8443  # 映射到宿主机的 GitLab HTTPS 端口
+  puma_workers: 2  # Puma 并发 Worker 数（防止高核服务器默认启动几十个 Worker 耗尽内存导致超时崩溃）
+  external_url: ""  # 外部访问 URL（留空则默认使用 http://localhost:8082）
 minio:
   image: "minio/minio:RELEASE.2025-04-22T22-12-26Z" # MinIO docker image tag
   port: 9000                                      # MinIO API port mapped to the host

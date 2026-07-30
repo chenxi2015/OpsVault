@@ -1,7 +1,9 @@
 package docker
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/docker/go-connections/nat"
@@ -31,7 +33,7 @@ func TestGitLabContainerSpec(t *testing.T) {
 	}
 
 	for hostPath, containerPath := range expectedBinds {
-		expectedBind := hostPath + ":" + containerPath
+		expectedBind := toDockerBind(hostPath, containerPath)
 		foundBind := false
 		for _, bind := range hostCfg.Binds {
 			if bind == expectedBind {
@@ -57,5 +59,36 @@ func TestGitLabContainerSpec(t *testing.T) {
 	port443 := nat.Port("443/tcp")
 	if hostCfg.PortBindings[port443][0].HostPort != "8443" {
 		t.Errorf("expected HTTPS port 443 mapping to 8443, got %s", hostCfg.PortBindings[port443][0].HostPort)
+	}
+}
+
+func TestGitLabPrepareConfig(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "opsvault-gitlab-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	cfg := testConfigWithRoot(tempDir)
+	cfg.Set("gitlab.port", 8082)
+	cfg.Set("gitlab.puma_workers", 2)
+
+	drv := NewGitLabDriver(WrapClient(nil), cfg)
+	if err := drv.prepareConfig(""); err != nil {
+		t.Fatalf("prepareConfig failed: %v", err)
+	}
+
+	rbPath := filepath.Join(tempDir, "gitlab", "config", "gitlab.rb")
+	data, err := os.ReadFile(rbPath)
+	if err != nil {
+		t.Fatalf("failed to read gitlab.rb: %v", err)
+	}
+
+	content := string(data)
+	if !strings.Contains(content, "nginx['listen_port'] = 80") {
+		t.Errorf("expected gitlab.rb to set nginx listen_port to 80, got:\n%s", content)
+	}
+	if !strings.Contains(content, "puma['worker_processes'] = 2") {
+		t.Errorf("expected gitlab.rb to set puma worker_processes to 2, got:\n%s", content)
 	}
 }
