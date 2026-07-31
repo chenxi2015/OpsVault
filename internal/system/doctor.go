@@ -278,6 +278,8 @@ func checkPorts(config *viper.Viper) DiagnosticItem {
 		{Service: "RocketMQ Broker", ConfigKey: "rocketmq.broker_port", Default: 10911},
 		{Service: "RabbitMQ 消息队列", ConfigKey: "rabbitmq.port", Default: 5672},
 		{Service: "RabbitMQ Web 控制台", ConfigKey: "rabbitmq.ui_port", Default: 15672},
+		{Service: "Kafka Broker 客户端", ConfigKey: "kafka.port", Default: 9092},
+		{Service: "Kafka Controller", ConfigKey: "kafka.controller_port", Default: 9093},
 		{Service: "PostgreSQL 数据库", ConfigKey: "postgres.port", Default: 5432},
 		{Service: "Elasticsearch API", ConfigKey: "elk.elasticsearch_port", Default: 9200},
 		{Service: "Kibana Web 界面", ConfigKey: "elk.kibana_port", Default: 5601},

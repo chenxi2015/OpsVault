@@ -110,5 +110,7 @@ k8s:
   dashboard:
     type: "kuboard"                               # 默认部署的 Web 管理面板类型
     port: 30080                                   # Kuboard v3 控制台 NodePort 端口
-
-
+kafka:
+  image: "apache/kafka:3.7.0"                     # Kafka Docker 镜像标签 (KRaft 模式)
+  port: 9092                                      # 映射到宿主机的 Kafka Broker 客户端端口
+  controller_port: 9093                           # 映射到宿主机的 Kafka Controller 端口

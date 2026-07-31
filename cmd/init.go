@@ -70,6 +70,7 @@ func newInitModel() *initModel {
 			{name: "redis", selected: true},
 			{name: "rocketmq", selected: false},
 			{name: "rabbitmq", selected: false},
+			{name: "kafka", selected: false},
 			{name: "postgres", selected: false},
 			{name: "elk", selected: false},
 			{name: "jenkins", selected: false},

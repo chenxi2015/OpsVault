@@ -2,7 +2,10 @@ package tui
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+
+	"OpsVault/internal/system"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -72,6 +75,14 @@ var ConfigCategories = []ConfigCategory{
 			"rabbitmq.ui_port",
 			"rabbitmq.admin_user",
 			"rabbitmq.admin_pwd",
+		},
+	},
+	{
+		Name: "Kafka",
+		Keys: []string{
+			"kafka.image",
+			"kafka.port",
+			"kafka.controller_port",
 		},
 	},
 	{
@@ -269,7 +280,22 @@ func ConfigWizardView(m RootModel) string {
 			val = m.config.GetString(key)
 		}
 
-		line := fmt.Sprintf("%-28s : %s", key, val)
+		portStatus := ""
+		if strings.Contains(key, "port") {
+			if portNum, err := strconv.Atoi(val); err == nil && portNum > 0 {
+				if err := system.CheckPortAvailable(portNum); err != nil {
+					if pid, procName, errProc := system.GetPortOccupant(portNum); errProc == nil {
+						portStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(fmt.Sprintf(" [已占用: %d/%s]", pid, procName))
+					} else {
+						portStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(" [已占用]")
+					}
+				} else {
+					portStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render(" [空闲]")
+				}
+			}
+		}
+
+		line := fmt.Sprintf("%-28s : %s%s", key, val, portStatus)
 
 		if idx == m.selectedConfigItem {
 			if m.focus == focusDetail {

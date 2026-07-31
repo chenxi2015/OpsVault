@@ -27,6 +27,7 @@ func (p RuntimeStatusProvider) Services() []ServiceRef {
 		{Name: "redis", Driver: dockdrv.NewRedisDriver(dockdrv.WrapClient(cli), p.config, "")},
 		{Name: "rocketmq", Driver: dockdrv.NewRocketMQDriver(dockdrv.WrapClient(cli), p.config)},
 		{Name: "rabbitmq", Driver: dockdrv.NewRabbitMQDriver(dockdrv.WrapClient(cli), p.config, "", "")},
+		{Name: "kafka", Driver: dockdrv.NewKafkaDriver(dockdrv.WrapClient(cli), p.config)},
 		{Name: "postgres", Driver: dockdrv.NewPostgresDriver(dockdrv.WrapClient(cli), p.config, "")},
 		{Name: "elk", Driver: dockdrv.NewELKDriver(dockdrv.WrapClient(cli), p.config)},
 		{Name: "jenkins", Driver: dockdrv.NewJenkinsDriver(dockdrv.WrapClient(cli), p.config)},

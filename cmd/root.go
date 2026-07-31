@@ -13,6 +13,7 @@ import (
 	"OpsVault/cmd/gitlab"
 	"OpsVault/cmd/grafana"
 	"OpsVault/cmd/jenkins"
+	kafkacmd "OpsVault/cmd/kafka"
 	k8scmd "OpsVault/cmd/k8s"
 	"OpsVault/cmd/minio"
 	"OpsVault/cmd/mysql"
@@ -106,6 +107,7 @@ func init() {
 	rootCmd.AddCommand(redis.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(rocketmq.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(rabbitmq.NewCommand(config, dockerFactory))
+	rootCmd.AddCommand(kafkacmd.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(postgres.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(elk.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(jenkins.NewCommand(config, dockerFactory))
@@ -194,6 +196,10 @@ func applyDefaultConfig(v *viper.Viper) {
 	v.SetDefault("rocketmq.image", "apache/rocketmq:5.3.0")
 	v.SetDefault("rocketmq.namesrv_port", 9876)
 	v.SetDefault("rocketmq.broker_port", 10911)
+
+	v.SetDefault("kafka.image", "apache/kafka:3.7.0")
+	v.SetDefault("kafka.port", 9092)
+	v.SetDefault("kafka.controller_port", 9093)
 
 	v.SetDefault("rabbitmq.image", "rabbitmq:3-management")
 	v.SetDefault("rabbitmq.port", 5672)
