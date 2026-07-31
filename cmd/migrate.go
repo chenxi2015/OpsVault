@@ -67,13 +67,22 @@ func newMigrateHostCommand(cfg *viper.Viper) *cobra.Command {
 				return fmt.Errorf("both --source-group and --target-group are required")
 			}
 
-			// 特殊安全检查：如果是 minio 且开启了数据同步，进行提示并做安全拦截
+			// 特殊安全检查 1：如果是 minio 且开启了数据同步，进行提示并做安全拦截
 			if service == "minio" && syncData {
 				warnContent := fmt.Sprintf(
 					"⚠️  [WARN] 检测到迁移服务为 MinIO 对象存储！\n\n为防磁盘爆满及迁移超时，OpsVault 只会为您迁移并重建 MinIO 容器参数与配置，不默认在主机级别同步业务对象文件。\n\n请在目标主机拉起服务后，手动运行 `mc mirror` 等逻辑工具同步业务数据。",
 				)
 				cmd.Println(migrateWarnCard.Render(warnContent))
 				// 强制将 syncData 设为 false，确保不打包数据
+				syncData = false
+			}
+
+			// 特殊安全检查 2：如果是 k8s / k3s 集群，提示集群特有的节点/配置迁移机制
+			if (service == "k8s" || service == "k3s") && syncData {
+				warnContent := fmt.Sprintf(
+					"⚠️  [WARN] 检测到迁移服务为 Kubernetes (K3s) 集群服务！\n\nK8s 节点强绑定 IP 地址与集群 CA 证书，无法直接跨主机复制底层 sqlite/etcd 数据。\n\nOpsVault 将为您在目标主机上重建全新的 K8s 节点引擎并同步 Manifest 资源清单，请勿直接强行同步节点底层运行数据。",
+				)
+				cmd.Println(migrateWarnCard.Render(warnContent))
 				syncData = false
 			}
 

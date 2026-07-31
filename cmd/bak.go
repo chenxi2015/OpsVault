@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"OpsVault/internal/backup"
+	"OpsVault/pkg/logger"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -65,10 +66,13 @@ func newBakCreateCommand(cfg *viper.Viper) *cobra.Command {
 				services = []string{"all"}
 			}
 
+			logger.Infof("Creating configuration backup (services: %s)...", strings.Join(services, ", "))
 			meta, err := manager.CreateBackup(services, name, desc)
 			if err != nil {
+				logger.AuditLog("system", "backup-create", fmt.Sprintf("services=%s", strings.Join(services, ",")), false)
 				return err
 			}
+			logger.AuditLog("system", "backup-create", fmt.Sprintf("name=%s services=%s size=%d", meta.Name, strings.Join(meta.Services, ","), meta.SizeBytes), true)
 
 			// Display beautiful success message
 			sizeStr := formatBytes(meta.SizeBytes)
@@ -176,9 +180,12 @@ func newBakRestoreCommand(cfg *viper.Viper) *cobra.Command {
 			}
 
 			manager := backup.NewBackupManager(cfg)
+			logger.Infof("Restoring configuration backup %s (service: %s)...", name, service)
 			if err := manager.RestoreBackup(name, service); err != nil {
+				logger.AuditLog("system", "backup-restore", fmt.Sprintf("name=%s service=%s", name, service), false)
 				return err
 			}
+			logger.AuditLog("system", "backup-restore", fmt.Sprintf("name=%s service=%s", name, service), true)
 
 			cmd.Println(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10")).Render("\n✓ Configurations restored successfully!"))
 			cmd.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("Note: Please restart modified services to apply new configurations."))
@@ -199,9 +206,12 @@ func newBakDeleteCommand(cfg *viper.Viper) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			manager := backup.NewBackupManager(cfg)
+			logger.Infof("Deleting configuration backup %s...", name)
 			if err := manager.DeleteBackup(name); err != nil {
+				logger.AuditLog("system", "backup-delete", fmt.Sprintf("name=%s", name), false)
 				return err
 			}
+			logger.AuditLog("system", "backup-delete", fmt.Sprintf("name=%s", name), true)
 			cmd.Printf("Backup %s successfully deleted.\n", name)
 			return nil
 		},

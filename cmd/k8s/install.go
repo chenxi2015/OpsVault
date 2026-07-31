@@ -13,11 +13,12 @@ import (
 )
 
 var (
-	installEngine    string
-	installMode      string
-	installVersion   string
-	installDataDir   string
-	installScriptURL string
+	installEngine          string
+	installMode            string
+	installVersion         string
+	installDataDir         string
+	installScriptURL       string
+	installRegistryMirrors []string
 )
 
 var installCmd = &cobra.Command{
@@ -37,6 +38,13 @@ var installCmd = &cobra.Command{
 		}
 		if !cmd.Flags().Changed("install-script-url") && cfg.GetString("k8s.install_script_url") != "" {
 			installScriptURL = cfg.GetString("k8s.install_script_url")
+		}
+		if !cmd.Flags().Changed("registry-mirror") {
+			if mirrors := cfg.GetStringSlice("k8s.registry_mirrors"); len(mirrors) > 0 {
+				installRegistryMirrors = mirrors
+			} else {
+				installRegistryMirrors = k8sdriver.DefaultRegistryMirrors
+			}
 		}
 		if !cmd.Flags().Changed("data-dir") {
 			if cfg.GetString("k8s.data_dir") != "" {
@@ -62,7 +70,8 @@ var installCmd = &cobra.Command{
 		fmt.Printf("● 部署引擎  : %s\n", highlightStyle.Render(engineDesc))
 		fmt.Printf("● 运行模式  : %s\n", highlightStyle.Render(installMode))
 		fmt.Printf("● 目标版本  : %s\n", installVersion)
-		fmt.Printf("● 数据存储  : %s\n\n", installDataDir)
+		fmt.Printf("● 数据存储  : %s\n", installDataDir)
+		fmt.Printf("● 镜像源加速: %v\n\n", installRegistryMirrors)
 
 		cli, _ := dockercli.New()
 		if cli != nil {
@@ -71,7 +80,7 @@ var installCmd = &cobra.Command{
 
 		ctx := context.Background()
 
-		err := k8sdriver.InstallCluster(ctx, cli, installEngine, installMode, installVersion, installDataDir, installScriptURL)
+		err := k8sdriver.InstallCluster(ctx, cli, installEngine, installMode, installVersion, installDataDir, installScriptURL, installRegistryMirrors)
 		if err != nil {
 			return err
 		}
@@ -94,6 +103,7 @@ func init() {
 	installCmd.Flags().StringVar(&installVersion, "version", k8sdriver.DefaultK3sVersion, "Kubernetes / K3s 集群版本")
 	installCmd.Flags().StringVar(&installDataDir, "data-dir", "", "宿主机持久化数据根目录（留空则自动使用 {system.root_dir}/k3s）")
 	installCmd.Flags().StringVar(&installScriptURL, "install-script-url", "", "K3s 二进制安装脚本下载 URL（留空则优先使用 k8s.install_script_url 配置）")
+	installCmd.Flags().StringSliceVar(&installRegistryMirrors, "registry-mirror", nil, "K3s / Containerd 容器镜像加速源 (支持多次指定或逗号分隔，默认使用国内主流镜像源)")
 
 	K8sCmd.AddCommand(installCmd)
 }

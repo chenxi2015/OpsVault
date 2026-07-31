@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	dashboardType string
-	dashboardPort int
+	dashboardType  string
+	dashboardPort  int
+	resetDashboard bool
 )
 
 var dashboardCmd = &cobra.Command{
@@ -36,7 +37,7 @@ var dashboardCmd = &cobra.Command{
 			return fmt.Errorf("暂不支持的面板类型: %s (目前支持: kuboard)", dashboardType)
 		}
 
-		err := k8sdriver.DeployKuboard(KubeConfigPath, dashboardPort)
+		err := k8sdriver.DeployKuboard(KubeConfigPath, dashboardPort, resetDashboard)
 		if err != nil {
 			return fmt.Errorf("部署 %s 面板失败: %w", dashboardType, err)
 		}
@@ -56,6 +57,8 @@ var dashboardCmd = &cobra.Command{
 func init() {
 	dashboardCmd.Flags().StringVar(&dashboardType, "type", "kuboard", "控制面板类型 (默认 kuboard)")
 	dashboardCmd.Flags().IntVar(&dashboardPort, "port", k8sdriver.DefaultKuboardPort, "映射暴露的 NodePort 端口号")
+	dashboardCmd.Flags().BoolVar(&resetDashboard, "reset", false, "强力重置已有的控制面板 Deployment/Service 与僵尸 Pod 并重新部署")
 
 	K8sCmd.AddCommand(dashboardCmd)
 }
+

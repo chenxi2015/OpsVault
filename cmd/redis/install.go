@@ -1,9 +1,12 @@
 package redis
 
 import (
+	"fmt"
+
 	"OpsVault/cmd/common"
 	"OpsVault/internal/driver"
 	"OpsVault/pkg/credutil"
+	"OpsVault/pkg/logger"
 
 	"github.com/spf13/cobra"
 )
@@ -29,9 +32,12 @@ func (c *commandSet) newInstallCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			logger.Infof("Installing Redis service...")
 			if err := drv.Install(); err != nil {
+				logger.AuditLog("redis", "install", fmt.Sprintf("image=%s", c.config.GetString("redis.image")), false)
 				return err
 			}
+			logger.AuditLog("redis", "install", fmt.Sprintf("image=%s", c.config.GetString("redis.image")), true)
 			credutil.PrintCredentials("Redis", drv.GetCredentials())
 			return nil
 		},

@@ -230,16 +230,25 @@ func (d *BaseDriver) EnsureReady(ctx context.Context) error {
 }
 
 func (d *BaseDriver) Start() error {
+	logger.Infof("[%s] Starting Docker container %s...", d.Name, d.ContainerName)
 	if err := d.checkAndInstallDocker(); err != nil {
+		logger.Errorf("[%s] Failed docker installation check: %v", d.Name, err)
 		return err
 	}
 	if d.Client == nil {
 		return fmt.Errorf("docker client is not available")
 	}
-	return d.Client.ContainerStart(context.Background(), d.ContainerName, container.StartOptions{})
+	err := d.Client.ContainerStart(context.Background(), d.ContainerName, container.StartOptions{})
+	if err != nil {
+		logger.Errorf("[%s] Failed to start container %s: %v", d.Name, d.ContainerName, err)
+		return err
+	}
+	logger.Infof("[%s] Container %s started successfully", d.Name, d.ContainerName)
+	return nil
 }
 
 func (d *BaseDriver) Stop() error {
+	logger.Infof("[%s] Stopping Docker container %s...", d.Name, d.ContainerName)
 	if err := d.checkAndInstallDocker(); err != nil {
 		return err
 	}
@@ -247,10 +256,17 @@ func (d *BaseDriver) Stop() error {
 		return fmt.Errorf("docker client is not available")
 	}
 	timeout := 10
-	return d.Client.ContainerStop(context.Background(), d.ContainerName, container.StopOptions{Timeout: &timeout})
+	err := d.Client.ContainerStop(context.Background(), d.ContainerName, container.StopOptions{Timeout: &timeout})
+	if err != nil {
+		logger.Errorf("[%s] Failed to stop container %s: %v", d.Name, d.ContainerName, err)
+		return err
+	}
+	logger.Infof("[%s] Container %s stopped", d.Name, d.ContainerName)
+	return nil
 }
 
 func (d *BaseDriver) Restart() error {
+	logger.Infof("[%s] Restarting Docker container %s...", d.Name, d.ContainerName)
 	if err := d.Stop(); err != nil {
 		return err
 	}
@@ -258,13 +274,19 @@ func (d *BaseDriver) Restart() error {
 }
 
 func (d *BaseDriver) Uninstall(purgeData bool) error {
+	logger.Infof("[%s] Uninstalling container %s (purgeData=%v)...", d.Name, d.ContainerName, purgeData)
 	_ = d.checkAndInstallDocker() // Best effort checking before deletion
 	if d.Client != nil {
 		_ = d.Client.ContainerRemove(context.Background(), d.ContainerName, container.RemoveOptions{Force: true})
 	}
 	if purgeData {
-		return os.RemoveAll(d.DataDir)
+		logger.Infof("[%s] Purging data directory %s", d.Name, d.DataDir)
+		if err := os.RemoveAll(d.DataDir); err != nil {
+			logger.Errorf("[%s] Failed to remove data directory %s: %v", d.Name, d.DataDir, err)
+			return err
+		}
 	}
+	logger.Infof("[%s] Uninstalled container %s successfully", d.Name, d.ContainerName)
 	return nil
 }
 
@@ -314,18 +336,23 @@ func (d *BaseDriver) Status() (*driver.ServiceStatus, error) {
 }
 
 func (d *BaseDriver) installWithSpec(specFn func() (*container.Config, *container.HostConfig, error)) error {
+	logger.Infof("[%s] Preparing installation for container %s...", d.Name, d.ContainerName)
 	if d.Client == nil {
 		return fmt.Errorf("docker client is not available")
 	}
 	ctx := context.Background()
 	if err := d.EnsureReady(ctx); err != nil {
+		logger.Errorf("[%s] Failed during EnsureReady: %v", d.Name, err)
 		return err
 	}
+	logger.Infof("[%s] Pulling image %s...", d.Name, d.Image)
 	if err := d.pullImage(ctx, d.Image); err != nil {
+		logger.Errorf("[%s] Failed to pull image %s: %v", d.Name, d.Image, err)
 		return err
 	}
 	cfg, hostCfg, err := specFn()
 	if err != nil {
+		logger.Errorf("[%s] Failed to generate container spec: %v", d.Name, err)
 		return err
 	}
 	d.applyResources(hostCfg)
@@ -334,19 +361,26 @@ func (d *BaseDriver) installWithSpec(specFn func() (*container.Config, *containe
 			d.NetworkName: {},
 		},
 	}
+	logger.Infof("[%s] Creating Docker container %s...", d.Name, d.ContainerName)
 	resp, err := d.Client.ContainerCreate(ctx, cfg, hostCfg, networkingConfig, nil, d.ContainerName)
 	if err != nil {
+		logger.Errorf("[%s] Failed to create container %s: %v", d.Name, d.ContainerName, err)
 		return err
 	}
 	createdID := resp.ID
+	logger.Infof("[%s] Starting container %s (ID: %s)...", d.Name, d.ContainerName, createdID[:12])
 	if err := d.Client.ContainerStart(ctx, createdID, container.StartOptions{}); err != nil {
 		_ = d.Client.ContainerRemove(ctx, d.ContainerName, container.RemoveOptions{Force: true})
+		logger.Errorf("[%s] Failed to start container %s: %v", d.Name, d.ContainerName, err)
 		return err
 	}
+	logger.Infof("[%s] Waiting for container %s to pass health check...", d.Name, d.ContainerName)
 	if err := d.waitForHealthy(ctx, d.ContainerName); err != nil {
 		_ = d.Client.ContainerRemove(ctx, d.ContainerName, container.RemoveOptions{Force: true})
+		logger.Errorf("[%s] Container %s failed health check: %v", d.Name, d.ContainerName, err)
 		return err
 	}
+	logger.Infof("[%s] Container %s installed and healthy", d.Name, d.ContainerName)
 	return nil
 }
 

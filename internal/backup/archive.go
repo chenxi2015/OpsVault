@@ -55,10 +55,11 @@ func (m *BackupManager) CreateBackup(services []string, customName, description 
 	} else {
 		for _, s := range services {
 			name := strings.ToLower(s)
-			if _, ok := resolvedPaths[name]; ok {
+			if path, ok := m.ResolveServicePath(name); ok {
 				targets = append(targets, name)
+				resolvedPaths[name] = path
 			} else {
-				return nil, fmt.Errorf("unknown service: %s", s)
+				return nil, fmt.Errorf("unknown service or configuration path not found: %s", s)
 			}
 		}
 	}
@@ -139,13 +140,14 @@ func (m *BackupManager) CreateBackup(services []string, customName, description 
 
 	metaData, err := json.MarshalIndent(meta, "", "  ")
 	if err != nil {
-		return nil, fmt.Errorf("marshal backup metadata: %w", err)
+		return nil, fmt.Errorf("marshal metadata: %w", err)
 	}
 
 	if err := os.WriteFile(jsonPath, metaData, 0o644); err != nil {
-		return nil, fmt.Errorf("write backup metadata file: %w", err)
+		return nil, fmt.Errorf("write metadata file: %w", err)
 	}
 
+	logger.Infof("Backup archive %s successfully created (%d bytes)", tarGzPath, fi.Size())
 	return meta, nil
 }
 
@@ -218,6 +220,12 @@ func (m *BackupManager) RestoreBackup(name, serviceName string) error {
 
 		targetBaseDir, ok := resolvedPaths[service]
 		if !ok {
+			if path, found := m.ResolveServicePath(service); found {
+				targetBaseDir = path
+				ok = true
+			}
+		}
+		if !ok {
 			continue
 		}
 
@@ -232,28 +240,35 @@ func (m *BackupManager) RestoreBackup(name, serviceName string) error {
 			targetPath = filepath.Join(targetBaseDir, subPath)
 		}
 
+		// Security check: prevent Tar Slip path traversal
+		cleanTarget := filepath.Clean(targetPath)
+		cleanBase := filepath.Clean(targetBaseDir)
+		if !strings.HasPrefix(cleanTarget, cleanBase) {
+			return fmt.Errorf("security error: path traversal detected in tar entry: %s", header.Name)
+		}
+
 		// Process entry based on type
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := fileutil.EnsureDir(targetPath, os.FileMode(header.Mode)); err != nil {
-				return fmt.Errorf("create directory %s: %w", targetPath, err)
+			if err := fileutil.EnsureDir(cleanTarget, os.FileMode(header.Mode)); err != nil {
+				return fmt.Errorf("create directory %s: %w", cleanTarget, err)
 			}
 		case tar.TypeReg:
 			// Ensure parent directory exists
-			parentDir := filepath.Dir(targetPath)
+			parentDir := filepath.Dir(cleanTarget)
 			if err := fileutil.EnsureDir(parentDir, 0o755); err != nil {
-				return fmt.Errorf("create parent directory for %s: %w", targetPath, err)
+				return fmt.Errorf("create parent directory for %s: %w", cleanTarget, err)
 			}
 
 			// Open file for writing
-			outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.FileMode(header.Mode))
+			outFile, err := os.OpenFile(cleanTarget, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.FileMode(header.Mode))
 			if err != nil {
-				return fmt.Errorf("create file %s: %w", targetPath, err)
+				return fmt.Errorf("create file %s: %w", cleanTarget, err)
 			}
 
 			if _, err := io.Copy(outFile, tr); err != nil {
 				outFile.Close()
-				return fmt.Errorf("write file %s: %w", targetPath, err)
+				return fmt.Errorf("write file %s: %w", cleanTarget, err)
 			}
 			outFile.Close()
 		}
@@ -269,6 +284,13 @@ func (m *BackupManager) RestoreBackup(name, serviceName string) error {
 		if !found {
 			restoredServices = append(restoredServices, service)
 		}
+	}
+
+	if len(restoredServices) == 0 {
+		if serviceName != "" && strings.ToLower(serviceName) != "all" {
+			return fmt.Errorf("no configuration files found in backup '%s' matching service '%s'", name, serviceName)
+		}
+		return fmt.Errorf("no configurations found in backup '%s' to restore", name)
 	}
 
 	logger.Infof("Successfully restored configurations for services: %s", strings.Join(restoredServices, ", "))

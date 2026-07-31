@@ -194,3 +194,95 @@ func (d *K8sDriver) Uninstall(purgeData bool) error {
 func (d *K8sDriver) Upgrade(targetVersion string) error {
 	return nil
 }
+
+// DeletePod deletes a single pod from the specified namespace.
+// If force is true, it sets GracePeriodSeconds to 0 for immediate force deletion.
+func DeletePod(ctx context.Context, kubeconfig, namespace, podName string, force bool) error {
+	clientset, _, err := GetK8sClient(kubeconfig)
+	if err != nil {
+		return fmt.Errorf("连接 K8s 集群失败: %w", err)
+	}
+	if namespace == "" {
+		namespace = "default"
+	}
+
+	opts := metav1.DeleteOptions{}
+	if force {
+		zero := int64(0)
+		opts.GracePeriodSeconds = &zero
+		policy := metav1.DeletePropagationBackground
+		opts.PropagationPolicy = &policy
+	}
+
+	err = clientset.CoreV1().Pods(namespace).Delete(ctx, podName, opts)
+	if err != nil {
+		return fmt.Errorf("删除 Pod %s/%s 失败: %w", namespace, podName, err)
+	}
+	return nil
+}
+
+// CleanupFailedPods scans and force-deletes all abnormal or stuck pods in namespace (or all namespaces if empty).
+// Returns the count of deleted pods.
+func CleanupFailedPods(ctx context.Context, kubeconfig, namespace string) (int, error) {
+	clientset, _, err := GetK8sClient(kubeconfig)
+	if err != nil {
+		return 0, fmt.Errorf("连接 K8s 集群失败: %w", err)
+	}
+
+	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return 0, fmt.Errorf("获取 Pod 列表失败: %w", err)
+	}
+
+	zero := int64(0)
+	forceOpts := metav1.DeleteOptions{
+		GracePeriodSeconds: &zero,
+	}
+
+	deletedCount := 0
+	for _, pod := range pods.Items {
+		isAbnormal := false
+
+		// 1. Phase is Failed or Unknown
+		if pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodUnknown {
+			isAbnormal = true
+		}
+
+		// 2. Pod is in Terminating state
+		if pod.DeletionTimestamp != nil {
+			isAbnormal = true
+		}
+
+		// 3. Status Reason is Evicted
+		if pod.Status.Reason == "Evicted" {
+			isAbnormal = true
+		}
+
+		// 4. Container status errors
+		for _, cs := range pod.Status.ContainerStatuses {
+			if cs.State.Waiting != nil {
+				reason := cs.State.Waiting.Reason
+				if reason == "CrashLoopBackOff" || reason == "ImagePullBackOff" || reason == "ErrImagePull" || reason == "CreateContainerConfigError" || reason == "InvalidImageName" {
+					isAbnormal = true
+					break
+				}
+			}
+			if cs.State.Terminated != nil && cs.State.Terminated.ExitCode != 0 {
+				if cs.RestartCount > 3 {
+					isAbnormal = true
+					break
+				}
+			}
+		}
+
+		if isAbnormal {
+			errDel := clientset.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, forceOpts)
+			if errDel == nil || errors.IsNotFound(errDel) {
+				deletedCount++
+			}
+		}
+	}
+
+	return deletedCount, nil
+}
+

@@ -15,6 +15,7 @@ import (
 
 	"OpsVault/internal/system"
 	"OpsVault/pkg/fileutil"
+	"OpsVault/pkg/logger"
 	"OpsVault/pkg/nginxconf"
 	"OpsVault/pkg/versionutil"
 
@@ -101,6 +102,14 @@ func (p nginxInstallPlan) nginxSourceDir() string {
 	return filepath.Join(p.sourceRoot, "nginx-"+p.version)
 }
 
+func (p nginxInstallPlan) pcreSourceDir() string {
+	return filepath.Join(p.sourceRoot, "pcre-"+p.pcreVersion)
+}
+
+func (p nginxInstallPlan) opensslSourceDir() string {
+	return filepath.Join(p.sourceRoot, "openssl-"+p.opensslVersion)
+}
+
 func (p nginxInstallPlan) configureArgs() []string {
 	args := []string{
 		"--prefix=" + p.installPath,
@@ -127,37 +136,61 @@ func (p nginxInstallPlan) configureArgs() []string {
 }
 
 func (i *nginxInstaller) Install() error {
+	logger.Infof("[nginx] Starting binary installation (Nginx v%s, OpenSSL v%s)...", i.plan.version, i.plan.opensslVersion)
+	logger.Infof("[nginx] Step 1/8: Installing host dependencies...")
 	if err := i.ensureHostDependencies(); err != nil {
+		logger.Errorf("[nginx] Failed to install host dependencies: %v", err)
 		return err
 	}
+	logger.Infof("[nginx] Step 2/8: Creating runtime user/group (%s)...", i.plan.runUser)
 	if err := i.ensureRuntimeUser(); err != nil {
+		logger.Errorf("[nginx] Failed to create runtime user: %v", err)
 		return err
 	}
+	logger.Infof("[nginx] Step 3/8: Preparing directories...")
 	if err := i.prepareDirectories(); err != nil {
+		logger.Errorf("[nginx] Failed to prepare directories: %v", err)
 		return err
 	}
+	logger.Infof("[nginx] Step 4/8: Downloading source archives...")
 	if err := i.downloadSources(); err != nil {
+		logger.Errorf("[nginx] Failed to download source archives: %v", err)
 		return err
 	}
+	logger.Infof("[nginx] Step 5/8: Extracting sources...")
 	if err := i.extractSources(); err != nil {
+		logger.Errorf("[nginx] Failed to extract source archives: %v", err)
 		return err
 	}
+	logger.Infof("[nginx] Step 6/8: Compiling and installing Nginx...")
 	if err := i.compileAndInstall(); err != nil {
+		logger.Errorf("[nginx] Failed during compile and install: %v", err)
 		return err
 	}
+	logger.Infof("[nginx] Step 7/8: Setting up symlinks and runtime config files...")
 	if err := i.ensureSymlinks(); err != nil {
+		logger.Errorf("[nginx] Failed to set up symlinks: %v", err)
 		return err
 	}
 	if err := i.writeRuntimeFiles(); err != nil {
+		logger.Errorf("[nginx] Failed to write runtime config files: %v", err)
 		return err
 	}
+	logger.Infof("[nginx] Step 8/8: Enabling and starting Nginx systemd service...")
 	if err := system.ReloadDaemon(); err != nil {
+		logger.Errorf("[nginx] Failed to reload systemd daemon: %v", err)
 		return err
 	}
 	if err := system.EnableService("nginx"); err != nil {
+		logger.Errorf("[nginx] Failed to enable Nginx service: %v", err)
 		return err
 	}
-	return system.StartService("nginx")
+	if err := system.StartService("nginx"); err != nil {
+		logger.Errorf("[nginx] Failed to start Nginx service: %v", err)
+		return err
+	}
+	logger.Infof("[nginx] Nginx binary installation completed successfully!")
+	return nil
 }
 
 func (i *nginxInstaller) ensureSymlinks() error {

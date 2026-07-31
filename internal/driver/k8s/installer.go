@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"OpsVault/pkg/dockercli"
+	"OpsVault/pkg/logger"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -33,17 +34,54 @@ const (
 	DefaultK3sInstallScriptURL = "https://rancher-mirror.rancher.cn/k3s/k3s-install.sh"
 )
 
+var DefaultRegistryMirrors = []string{
+	"https://docker.m.daocloud.io",
+	"https://dockerpull.com",
+	"https://dockerproxy.cn",
+}
+
+// SetupK3sRegistries writes /etc/rancher/k3s/registries.yaml with the provided mirror endpoints.
+func SetupK3sRegistries(mirrors []string) error {
+	if len(mirrors) == 0 {
+		mirrors = DefaultRegistryMirrors
+	}
+	rancherDir := "/etc/rancher/k3s"
+	if err := os.MkdirAll(rancherDir, 0755); err != nil {
+		return fmt.Errorf("创建 K3s 配置目录 %s 失败: %w", rancherDir, err)
+	}
+
+	var sb strings.Builder
+	sb.WriteString("mirrors:\n")
+	sb.WriteString("  \"docker.io\":\n")
+	sb.WriteString("    endpoint:\n")
+	for _, m := range mirrors {
+		m = strings.TrimSpace(m)
+		if m != "" {
+			sb.WriteString(fmt.Sprintf("      - %q\n", m))
+		}
+	}
+
+	regFile := filepath.Join(rancherDir, "registries.yaml")
+	if err := os.WriteFile(regFile, []byte(sb.String()), 0644); err != nil {
+		return fmt.Errorf("写入 K3s 镜像源配置 %s 失败: %w", regFile, err)
+	}
+
+	fmt.Printf("✔ 已自动配置 K3s 容器镜像加速源 (%d 个源已生效 -> %s)\n", len(mirrors), regFile)
+	return nil
+}
+
 // InstallCluster is the unified entry point for cluster installation using specified engine (k3s, kubeadm, k0s).
-func InstallCluster(ctx context.Context, cli *client.Client, engine, mode, version, dataDir, installScriptURL string) error {
+func InstallCluster(ctx context.Context, cli *client.Client, engine, mode, version, dataDir, installScriptURL string, registryMirrors []string) error {
+	logger.Infof("[k8s] Requesting K8s cluster installation (engine=%s, mode=%s, version=%s)...", engine, mode, version)
 	switch strings.ToLower(engine) {
 	case "k3s", "":
 		if mode == "docker" {
 			if cli == nil {
 				return fmt.Errorf("Docker 模式需要 Docker 守护进程处于运行状态")
 			}
-			return InstallK3sDocker(ctx, cli, version, dataDir)
+			return InstallK3sDocker(ctx, cli, version, dataDir, registryMirrors)
 		}
-		return InstallK3sBinary(version, dataDir, installScriptURL)
+		return InstallK3sBinary(version, dataDir, installScriptURL, registryMirrors)
 
 	case "kubeadm":
 		return InstallKubeadmNative(ctx, version, dataDir)
@@ -65,7 +103,7 @@ func InstallKubeadmNative(ctx context.Context, version, dataDir string) error {
 }
 
 // InstallK3sBinary installs K3s as a native systemd service on Linux.
-func InstallK3sBinary(version string, dataDir string, installScriptURL string) error {
+func InstallK3sBinary(version string, dataDir string, installScriptURL string, registryMirrors []string) error {
 	if version == "" {
 		version = DefaultK3sVersion
 	}
@@ -78,11 +116,16 @@ func InstallK3sBinary(version string, dataDir string, installScriptURL string) e
 
 	_ = os.MkdirAll(dataDir, 0755)
 
-	// 1. Enable IP forwarding
+	// 1. Configure K3s container registry mirrors before starting
+	if err := SetupK3sRegistries(registryMirrors); err != nil {
+		fmt.Printf("⚠️  配置 K3s 镜像源提示: %v\n", err)
+	}
+
+	// 2. Enable IP forwarding
 	_ = exec.Command("sysctl", "-w", "net.ipv4.ip_forward=1").Run()
 	_ = exec.Command("sysctl", "-w", "net.bridge.bridge-nf-call-iptables=1").Run()
 
-	// 2. Fetch and run installation script with configured script URL
+	// 3. Fetch and run installation script with configured script URL
 	if _, err := os.Stat("/usr/local/bin/k3s"); err == nil {
 		fmt.Println("💡 检测到宿主机已存在 /usr/local/bin/k3s 二进制文件，将自动复用并跳过下载...")
 	}
@@ -122,7 +165,7 @@ func InstallK3sBinary(version string, dataDir string, installScriptURL string) e
 }
 
 // InstallK3sDocker runs K3s inside a Docker container.
-func InstallK3sDocker(ctx context.Context, cli *client.Client, version string, dataDir string) error {
+func InstallK3sDocker(ctx context.Context, cli *client.Client, version string, dataDir string, registryMirrors []string) error {
 	if version == "" {
 		version = DefaultK3sVersion
 	}
@@ -230,7 +273,7 @@ func UninstallK3s(ctx context.Context, cli *client.Client, mode string, purge bo
 }
 
 // DeployKuboard deploys Kuboard v3 Web Console into the Kubernetes cluster.
-func DeployKuboard(kubeconfig string, nodePort int) error {
+func DeployKuboard(kubeconfig string, nodePort int, reset bool) error {
 	if nodePort <= 0 {
 		nodePort = DefaultKuboardPort
 	}
@@ -247,6 +290,18 @@ func DeployKuboard(kubeconfig string, nodePort int) error {
 
 	ctx := context.Background()
 
+	deployGVR := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+	svcGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}
+
+	// If reset requested, clean up existing Kuboard deployment, service and zombie pods first
+	if reset {
+		fmt.Println("🧹 正在强力重置与清理已有的 Kuboard 控制面板资源...")
+		_ = dynClient.Resource(deployGVR).Namespace("kuboard").Delete(ctx, "kuboard-v3", metav1.DeleteOptions{})
+		_ = dynClient.Resource(svcGVR).Namespace("kuboard").Delete(ctx, "kuboard-v3", metav1.DeleteOptions{})
+		_, _ = CleanupFailedPods(ctx, kubeconfig, "kuboard")
+		time.Sleep(2 * time.Second)
+	}
+
 	// 1. Ensure 'kuboard' Namespace exists
 	nsGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
 	nsObj := &unstructured.Unstructured{
@@ -261,7 +316,6 @@ func DeployKuboard(kubeconfig string, nodePort int) error {
 	_, _ = dynClient.Resource(nsGVR).Create(ctx, nsObj, metav1.CreateOptions{})
 
 	// 2. Deploy Kuboard Deployment
-	deployGVR := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
 	deployObj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "apps/v1",
@@ -287,7 +341,7 @@ func DeployKuboard(kubeconfig string, nodePort int) error {
 						"containers": []interface{}{
 							map[string]interface{}{
 								"name":  "kuboard",
-								"image": "eipwork/kuboard:v3",
+								"image": "swr.cn-east-2.myhuaweicloud.com/kuboard/kuboard:v3",
 								"ports": []interface{}{
 									map[string]interface{}{
 										"containerPort": 80,
@@ -306,7 +360,6 @@ func DeployKuboard(kubeconfig string, nodePort int) error {
 	}
 
 	// 3. Deploy Kuboard Service (NodePort)
-	svcGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}
 	svcObj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "v1",

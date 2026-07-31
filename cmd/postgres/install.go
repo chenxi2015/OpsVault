@@ -1,9 +1,12 @@
 package postgres
 
 import (
+	"fmt"
+
 	"OpsVault/cmd/common"
 	"OpsVault/internal/driver"
 	"OpsVault/pkg/credutil"
+	"OpsVault/pkg/logger"
 
 	"github.com/spf13/cobra"
 )
@@ -29,9 +32,12 @@ func (c *commandSet) newInstallCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			logger.Infof("Installing PostgreSQL service...")
 			if err := drv.Install(); err != nil {
+				logger.AuditLog("postgres", "install", fmt.Sprintf("image=%s", c.config.GetString("postgres.image")), false)
 				return err
 			}
+			logger.AuditLog("postgres", "install", fmt.Sprintf("image=%s", c.config.GetString("postgres.image")), true)
 			credutil.PrintCredentials("PostgreSQL", drv.GetCredentials())
 			return nil
 		},

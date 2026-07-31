@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// ResolveConfigPaths resolves the host configuration file or directory paths for each service.
-func (m *BackupManager) ResolveConfigPaths() map[string]string {
+// GetDataRoot returns the configured data root path or fallback default.
+func (m *BackupManager) GetDataRoot() string {
 	dataRoot := m.config.GetString("docker.data_root")
 	if dataRoot == "" {
 		dataRoot = m.config.GetString("system.root_dir")
@@ -15,6 +15,13 @@ func (m *BackupManager) ResolveConfigPaths() map[string]string {
 			dataRoot = "/data/opsvault"
 		}
 	}
+	return dataRoot
+}
+
+// ResolveConfigPaths resolves the host configuration file or directory paths for each service.
+// It combines explicit service path mappings and dynamic lookup under dataRoot.
+func (m *BackupManager) ResolveConfigPaths() map[string]string {
+	dataRoot := m.GetDataRoot()
 
 	nginxInstallPath := m.config.GetString("nginx.install_path")
 	if nginxInstallPath == "" {
@@ -26,6 +33,11 @@ func (m *BackupManager) ResolveConfigPaths() map[string]string {
 		nginxVhostDir = filepath.Join(nginxInstallPath, "conf", "vhost")
 	}
 
+	k3sDataDir := m.config.GetString("k8s.data_dir")
+	if k3sDataDir == "" {
+		k3sDataDir = filepath.Join(dataRoot, "k3s")
+	}
+
 	paths := map[string]string{
 		"nginx":       nginxVhostDir,
 		"mysql":       filepath.Join(dataRoot, "mysql", "conf"),
@@ -35,7 +47,52 @@ func (m *BackupManager) ResolveConfigPaths() map[string]string {
 		"postgres":    filepath.Join(dataRoot, "postgres", "conf"),
 		"elk":         filepath.Join(dataRoot, "elk", "conf"),
 		"nacos":       filepath.Join(dataRoot, "nacos", "conf"),
+		"minio":       filepath.Join(dataRoot, "minio", "conf"),
+		"jenkins":     filepath.Join(dataRoot, "jenkins", "conf"),
+		"gitlab":      filepath.Join(dataRoot, "gitlab", "conf"),
+		"prometheus":  filepath.Join(dataRoot, "prometheus", "conf"),
+		"grafana":     filepath.Join(dataRoot, "grafana", "conf"),
+		"ansible":     filepath.Join(dataRoot, "ansible"),
+		"k8s":         k3sDataDir,
+		"k3s":         k3sDataDir,
 		"system_root": dataRoot,
+	}
+
+	// Dynamic fallback: scan subdirectories under dataRoot for any unmapped services
+	if entries, err := os.ReadDir(dataRoot); err == nil {
+		excludeDirs := m.config.GetStringSlice("backup.exclude_dirs")
+		if len(excludeDirs) == 0 {
+			excludeDirs = []string{"data", "logs", "log", "wwwlogs", "bin", "wwwroot", "bak"}
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			svcName := strings.ToLower(entry.Name())
+			if _, exists := paths[svcName]; exists {
+				continue
+			}
+
+			isExcluded := false
+			for _, ex := range excludeDirs {
+				if strings.EqualFold(svcName, ex) {
+					isExcluded = true
+					break
+				}
+			}
+			if isExcluded {
+				continue
+			}
+
+			// Priority 1: dataRoot/<service>/conf if exists
+			confDir := filepath.Join(dataRoot, entry.Name(), "conf")
+			if fi, err := os.Stat(confDir); err == nil && fi.IsDir() {
+				paths[svcName] = confDir
+			} else {
+				// Priority 2: dataRoot/<service>
+				paths[svcName] = filepath.Join(dataRoot, entry.Name())
+			}
+		}
 	}
 
 	// Add global configuration file if loaded
@@ -50,6 +107,31 @@ func (m *BackupManager) ResolveConfigPaths() map[string]string {
 	}
 
 	return paths
+}
+
+// ResolveServicePath resolves the config path for a specific service dynamically if needed.
+func (m *BackupManager) ResolveServicePath(service string) (string, bool) {
+	service = strings.ToLower(service)
+	paths := m.ResolveConfigPaths()
+	if path, ok := paths[service]; ok {
+		return path, true
+	}
+
+	dataRoot := m.GetDataRoot()
+
+	// Dynamic check 1: dataRoot/<service>/conf
+	confPath := filepath.Join(dataRoot, service, "conf")
+	if _, err := os.Stat(confPath); err == nil {
+		return confPath, true
+	}
+
+	// Dynamic check 2: dataRoot/<service>
+	svcPath := filepath.Join(dataRoot, service)
+	if _, err := os.Stat(svcPath); err == nil {
+		return svcPath, true
+	}
+
+	return "", false
 }
 
 // shouldExclude checks if a path should be excluded from the backup.

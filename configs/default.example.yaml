@@ -103,6 +103,10 @@ k8s:
   version: "v1.31.2+k3s1"                         # 默认 K3s 发行版安装版本
   data_dir: ""                                    # 宿主机 K3s 持久化数据存储路径（留空则默认使用 {system.root_dir}/k3s）
   install_script_url: "https://rancher-mirror.rancher.cn/k3s/k3s-install.sh"  # K3s 安装脚本 URL (支持国内镜像源或自定义源脚本)
+  registry_mirrors:                               # K3s / Containerd 容器镜像加速源列表
+    - https://docker.m.daocloud.io
+    - https://dockerpull.com
+    - https://dockerproxy.cn
   dashboard:
     type: "kuboard"                               # 默认部署的 Web 管理面板类型
     port: 30080                                   # Kuboard v3 控制台 NodePort 端口

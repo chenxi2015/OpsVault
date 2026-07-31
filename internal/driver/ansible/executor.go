@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+
+	"OpsVault/pkg/logger"
 )
 
 // Executor is responsible for running ansible CLI commands.
@@ -24,6 +26,7 @@ func NewExecutor(cfg *Config, inventoryPath string) *Executor {
 
 // RunAnsible runs the basic ansible ad-hoc command.
 func (e *Executor) RunAnsible(ctx context.Context, group string, module string, args string, stdout, stderr io.Writer) error {
+	logger.Infof("[ansible] Executing ad-hoc command (group=%s, module=%s)...", group, module)
 	cmdArgs := []string{
 		group,
 		"-i", e.InventoryPath,
@@ -40,13 +43,16 @@ func (e *Executor) RunAnsible(ctx context.Context, group string, module string, 
 	cmd.Env = append(os.Environ(), "ANSIBLE_HOST_KEY_CHECKING=False")
 
 	if err := cmd.Run(); err != nil {
+		logger.Errorf("[ansible] Ad-hoc command failed: %v", err)
 		return fmt.Errorf("ansible run failed: %w", err)
 	}
+	logger.Infof("[ansible] Ad-hoc command completed successfully")
 	return nil
 }
 
 // RunPlaybook runs an ansible-playbook command on the specified target group.
 func (e *Executor) RunPlaybook(ctx context.Context, playbookPath string, group string, extraVars map[string]string, stdout, stderr io.Writer) error {
+	logger.Infof("[ansible] Running playbook %s (group=%s)...", playbookPath, group)
 	cmdArgs := []string{
 		"-i", e.InventoryPath,
 		playbookPath,
@@ -65,7 +71,9 @@ func (e *Executor) RunPlaybook(ctx context.Context, playbookPath string, group s
 	cmd.Env = append(os.Environ(), "ANSIBLE_HOST_KEY_CHECKING=False")
 
 	if err := cmd.Run(); err != nil {
+		logger.Errorf("[ansible] Playbook execution failed: %v", err)
 		return fmt.Errorf("ansible-playbook run failed: %w", err)
 	}
+	logger.Infof("[ansible] Playbook %s executed successfully", playbookPath)
 	return nil
 }
