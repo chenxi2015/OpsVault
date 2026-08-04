@@ -96,3 +96,75 @@ func TestGitLabPrepareConfig(t *testing.T) {
 		t.Errorf("expected gitlab.rb to set gitlab_shell_ssh_port to 2222, got:\n%s", content)
 	}
 }
+
+func TestGitLabPrepareConfigUpdate(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "opsvault-gitlab-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	configDir := filepath.Join(tempDir, "gitlab", "config")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("failed to create config dir: %v", err)
+	}
+
+	rbPath := filepath.Join(configDir, "gitlab.rb")
+	initialContent := `external_url 'http://localhost:8082'
+nginx['listen_port'] = 80
+puma['worker_processes'] = 2
+gitlab_rails['gitlab_shell_ssh_port'] = 2222
+`
+	if err := os.WriteFile(rbPath, []byte(initialContent), 0o644); err != nil {
+		t.Fatalf("failed to write initial gitlab.rb: %v", err)
+	}
+
+	cfg := testConfigWithRoot(tempDir)
+	cfg.Set("gitlab.port", 8082)
+	cfg.Set("gitlab.ssh_port", 52222)
+	cfg.Set("gitlab.puma_workers", 4)
+
+	drv := NewGitLabDriver(WrapClient(nil), cfg)
+	if err := drv.prepareConfig(""); err != nil {
+		t.Fatalf("prepareConfig update failed: %v", err)
+	}
+
+	data, err := os.ReadFile(rbPath)
+	if err != nil {
+		t.Fatalf("failed to read updated gitlab.rb: %v", err)
+	}
+
+	content := string(data)
+	if !strings.Contains(content, "gitlab_rails['gitlab_shell_ssh_port'] = 52222") {
+		t.Errorf("expected gitlab.rb to update gitlab_shell_ssh_port to 52222, got:\n%s", content)
+	}
+	if !strings.Contains(content, "puma['worker_processes'] = 4") {
+		t.Errorf("expected gitlab.rb to update puma worker_processes to 4, got:\n%s", content)
+	}
+}
+
+func TestPortsNeedUpdate(t *testing.T) {
+	target := map[nat.Port]string{
+		nat.Port("80/tcp"):  "8082",
+		nat.Port("22/tcp"):  "52222",
+		nat.Port("443/tcp"): "8443",
+	}
+
+	actualMatch := nat.PortMap{
+		nat.Port("80/tcp"):  []nat.PortBinding{{HostPort: "8082"}},
+		nat.Port("22/tcp"):  []nat.PortBinding{{HostPort: "52222"}},
+		nat.Port("443/tcp"): []nat.PortBinding{{HostPort: "8443"}},
+	}
+	if portsNeedUpdate(actualMatch, target) {
+		t.Errorf("expected portsNeedUpdate to return false for matching ports")
+	}
+
+	actualMismatch := nat.PortMap{
+		nat.Port("80/tcp"):  []nat.PortBinding{{HostPort: "8082"}},
+		nat.Port("22/tcp"):  []nat.PortBinding{{HostPort: "2222"}},
+		nat.Port("443/tcp"): []nat.PortBinding{{HostPort: "8443"}},
+	}
+	if !portsNeedUpdate(actualMismatch, target) {
+		t.Errorf("expected portsNeedUpdate to return true for mismatched SSH port")
+	}
+}

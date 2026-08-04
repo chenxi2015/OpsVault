@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 
 	"OpsVault/internal/driver"
 	"OpsVault/pkg/credutil"
+	"OpsVault/pkg/logger"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -139,24 +141,130 @@ gitlab_rails['gitlab_shell_ssh_port'] = %d
 		data, err := os.ReadFile(rbFile)
 		if err == nil {
 			contentStr := string(data)
+			lines := strings.Split(contentStr, "\n")
+			hasSSHPort := false
+			hasPuma := false
+			hasNginx := false
+
+			targetSSHLine := fmt.Sprintf("gitlab_rails['gitlab_shell_ssh_port'] = %d", sshPort)
+			targetPumaLine := fmt.Sprintf("puma['worker_processes'] = %d", pumaWorkers)
+
+			for i, line := range lines {
+				trimmed := strings.TrimSpace(line)
+				if strings.Contains(trimmed, "gitlab_shell_ssh_port") {
+					if !strings.HasPrefix(trimmed, "#") {
+						lines[i] = targetSSHLine
+						hasSSHPort = true
+					}
+				}
+				if strings.Contains(trimmed, "puma['worker_processes']") {
+					if !strings.HasPrefix(trimmed, "#") {
+						lines[i] = targetPumaLine
+						hasPuma = true
+					}
+				}
+				if strings.Contains(trimmed, "nginx['listen_port']") {
+					if !strings.HasPrefix(trimmed, "#") {
+						hasNginx = true
+					}
+				}
+			}
+
 			var toAppend []string
-			if !strings.Contains(contentStr, "nginx['listen_port']") {
+			if !hasSSHPort {
+				toAppend = append(toAppend, targetSSHLine)
+			}
+			if !hasPuma {
+				toAppend = append(toAppend, targetPumaLine)
+			}
+			if !hasNginx {
 				toAppend = append(toAppend, "nginx['listen_port'] = 80")
 			}
-			if !strings.Contains(contentStr, "puma['worker_processes']") {
-				toAppend = append(toAppend, fmt.Sprintf("puma['worker_processes'] = %d", pumaWorkers))
-			}
-			if !strings.Contains(contentStr, "gitlab_shell_ssh_port") {
-				toAppend = append(toAppend, fmt.Sprintf("gitlab_rails['gitlab_shell_ssh_port'] = %d", sshPort))
-			}
+
+			newContent := strings.Join(lines, "\n")
 			if len(toAppend) > 0 {
-				newContent := contentStr + "\n# Appended by OpsVault optimization\n" + strings.Join(toAppend, "\n") + "\n"
+				if !strings.HasSuffix(newContent, "\n") {
+					newContent += "\n"
+				}
+				newContent += "# Appended by OpsVault optimization\n" + strings.Join(toAppend, "\n") + "\n"
+			}
+			if newContent != contentStr {
 				_ = os.WriteFile(rbFile, []byte(newContent), 0o644)
 			}
 		}
 	}
 
 	return nil
+}
+
+func (d *GitLabDriver) Restart() error {
+	logger.Infof("[%s] Restarting Docker container %s...", d.Name, d.ContainerName)
+	if err := d.checkAndInstallDocker(); err != nil {
+		return err
+	}
+	if d.Client == nil {
+		return fmt.Errorf("docker client is not available")
+	}
+
+	ctx := context.Background()
+	if err := d.EnsureReady(ctx); err != nil {
+		logger.Errorf("[%s] Failed EnsureReady during restart: %v", d.Name, err)
+		return err
+	}
+
+	inspect, err := d.Client.ContainerInspect(ctx, d.ContainerName)
+	if err == nil && inspect.HostConfig != nil {
+		hostPort := d.Config.GetString("gitlab.port")
+		if hostPort == "" {
+			hostPort = "8082"
+		}
+		hostSSHPort := d.Config.GetString("gitlab.ssh_port")
+		if hostSSHPort == "" {
+			hostSSHPort = "2222"
+		}
+		hostHTTPSPort := d.Config.GetString("gitlab.https_port")
+		if hostHTTPSPort == "" {
+			hostHTTPSPort = "8443"
+		}
+
+		targetPorts := map[nat.Port]string{
+			nat.Port("80/tcp"):  hostPort,
+			nat.Port("22/tcp"):  hostSSHPort,
+			nat.Port("443/tcp"): hostHTTPSPort,
+		}
+
+		if portsNeedUpdate(inspect.HostConfig.PortBindings, targetPorts) {
+			logger.Infof("[%s] Port mapping changed, recreating container %s...", d.Name, d.ContainerName)
+			timeout := 10
+			_ = d.Client.ContainerStop(ctx, d.ContainerName, container.StopOptions{Timeout: &timeout})
+			if err := d.Client.ContainerRemove(ctx, d.ContainerName, container.RemoveOptions{Force: true}); err != nil {
+				logger.Errorf("[%s] Failed to remove container for recreation: %v", d.Name, err)
+				return err
+			}
+			return d.installWithSpec(d.containerSpec)
+		}
+	}
+
+	if err := d.Stop(); err != nil {
+		return err
+	}
+	return d.Start()
+}
+
+func portsNeedUpdate(actual nat.PortMap, target map[nat.Port]string) bool {
+	if actual == nil {
+		return true
+	}
+	for containerPort, expectedHostPort := range target {
+		bindings, ok := actual[containerPort]
+		if !ok || len(bindings) == 0 {
+			return true
+		}
+		if bindings[0].HostPort != expectedHostPort {
+			return true
+		}
+	}
+	return false
 }
 
 func (d *GitLabDriver) Upgrade(targetVersion string) error {
