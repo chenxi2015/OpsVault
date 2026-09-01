@@ -20,8 +20,10 @@ import (
 	"OpsVault/cmd/nacos"
 	"OpsVault/cmd/nginx"
 	"OpsVault/cmd/nodeexporter"
+	"OpsVault/cmd/ollama"
 	"OpsVault/cmd/postgres"
 	"OpsVault/cmd/prometheus"
+	"OpsVault/cmd/qdrant"
 	"OpsVault/cmd/rabbitmq"
 	"OpsVault/cmd/redis"
 	"OpsVault/cmd/rocketmq"
@@ -121,6 +123,8 @@ func init() {
 	rootCmd.AddCommand(newMigrateCommand(config))
 	rootCmd.AddCommand(ansiblecmd.NewCommand(config))
 	rootCmd.AddCommand(k8scmd.NewCommand(config))
+	rootCmd.AddCommand(qdrant.NewCommand(config, dockerFactory))
+	rootCmd.AddCommand(ollama.NewCommand(config, dockerFactory))
 }
 
 func initConfig() error {

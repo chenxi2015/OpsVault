@@ -568,3 +568,38 @@ func TestNodeExporterContainerSpec(t *testing.T) {
 	}
 }
 
+func TestQdrantContainerSpec(t *testing.T) {
+	drv := NewQdrantDriver(WrapClient(nil), testConfigWithRoot("/data/opsvault"), "secret_key")
+	cfg, host, err := drv.containerSpec()
+	if err != nil {
+		t.Fatalf("containerSpec: %v", err)
+	}
+	if cfg.Image != "qdrant/qdrant:v1.13.0" {
+		t.Fatalf("image = %q", cfg.Image)
+	}
+	if len(cfg.Env) != 1 || cfg.Env[0] != "QDRANT__SERVICE__API_KEY=secret_key" {
+		t.Fatalf("env = %#v", cfg.Env)
+	}
+	if host.PortBindings[nat.Port("6333/tcp")][0].HostPort != "6333" {
+		t.Fatalf("port binding = %#v", host.PortBindings[nat.Port("6333/tcp")])
+	}
+	if host.PortBindings[nat.Port("6334/tcp")][0].HostPort != "6334" {
+		t.Fatalf("port binding = %#v", host.PortBindings[nat.Port("6334/tcp")])
+	}
+}
+
+func TestOllamaContainerSpec(t *testing.T) {
+	drv := NewOllamaDriver(WrapClient(nil), testConfigWithRoot("/data/opsvault"))
+	cfg, host, err := drv.containerSpec()
+	if err != nil {
+		t.Fatalf("containerSpec: %v", err)
+	}
+	if cfg.Image != "ollama/ollama:latest" {
+		t.Fatalf("image = %q", cfg.Image)
+	}
+	if host.PortBindings[nat.Port("11434/tcp")][0].HostPort != "11434" {
+		t.Fatalf("port binding = %#v", host.PortBindings[nat.Port("11434/tcp")])
+	}
+}
+
+
