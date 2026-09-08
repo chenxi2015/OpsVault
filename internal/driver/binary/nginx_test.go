@@ -1,6 +1,8 @@
 package binary
 
 import (
+	"bytes"
+	"compress/gzip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -384,6 +386,73 @@ func TestNginxDriverNoStart(t *testing.T) {
 	drv.NoStart = true
 	if !drv.NoStart {
 		t.Fatalf("expected drv.NoStart to be true after setting")
+	}
+}
+
+func TestNginxInstallPlanForce(t *testing.T) {
+	cfg := testNginxConfig(t)
+	cfg.Set("nginx.force", true)
+	plan := newNginxInstallPlan(cfg)
+	if !plan.force {
+		t.Fatalf("expected plan.force to be true when nginx.force is set")
+	}
+
+	cfgDefault := testNginxConfig(t)
+	planDefault := newNginxInstallPlan(cfgDefault)
+	if planDefault.force {
+		t.Fatalf("expected planDefault.force to be false by default")
+	}
+}
+
+func TestIsTarGzValid(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// 1. Non-existent file
+	if isTarGzValid(filepath.Join(tempDir, "not_exist.tar.gz")) {
+		t.Fatalf("expected non-existent file to be invalid")
+	}
+
+	// 2. Empty file
+	emptyFile := filepath.Join(tempDir, "empty.tar.gz")
+	if err := os.WriteFile(emptyFile, []byte{}, 0o644); err != nil {
+		t.Fatalf("failed to write empty file: %v", err)
+	}
+	if isTarGzValid(emptyFile) {
+		t.Fatalf("expected empty file to be invalid")
+	}
+
+	// 3. Fake HTML error page
+	htmlFile := filepath.Join(tempDir, "404.tar.gz")
+	if err := os.WriteFile(htmlFile, []byte("<html>404 Not Found</html>"), 0o644); err != nil {
+		t.Fatalf("failed to write html file: %v", err)
+	}
+	if isTarGzValid(htmlFile) {
+		t.Fatalf("expected html response file to be invalid")
+	}
+
+	// 4. Truncated gzip file (valid gzip header, but cut off before stream ends)
+	var gzBuf bytes.Buffer
+	gw := gzip.NewWriter(&gzBuf)
+	_, _ = gw.Write([]byte("Hello world! This is a long content to be compressed..."))
+	_ = gw.Close()
+	fullGzData := gzBuf.Bytes()
+	truncatedGzData := fullGzData[:len(fullGzData)-8] // truncate footer/checksum
+
+	truncatedFile := filepath.Join(tempDir, "truncated.tar.gz")
+	if err := os.WriteFile(truncatedFile, truncatedGzData, 0o644); err != nil {
+		t.Fatalf("failed to write truncated file: %v", err)
+	}
+	if isTarGzValid(truncatedFile) {
+		t.Fatalf("expected truncated gzip file to be invalid")
+	}
+
+	// 5. Valid gzip archive
+	validFile := filepath.Join(tempDir, "valid.tar.gz")
+	if err := os.WriteFile(validFile, fullGzData, 0o644); err != nil {
+		t.Fatalf("failed to write valid file: %v", err)
+	}
+	if !isTarGzValid(validFile) {
+		t.Fatalf("expected valid gzip file to be valid")
 	}
 }
 

@@ -24,6 +24,7 @@ import (
 type NginxDriver struct {
 	*BaseDriver
 	NoStart bool
+	Force   bool
 }
 
 var reloadNginx = func() error {
@@ -39,14 +40,17 @@ func (d *NginxDriver) isLinuxOrTest() bool {
 }
 
 func (d *NginxDriver) Install() error {
-	return d.InstallWithOptions(d.NoStart)
+	return d.InstallWithOptions(d.Force, d.NoStart)
 }
 
-func (d *NginxDriver) InstallWithOptions(noStart bool) error {
+func (d *NginxDriver) InstallWithOptions(force, noStart bool) error {
 	if !d.isLinuxOrTest() {
 		return fmt.Errorf("nginx binary installation is only supported on Linux (CentOS/RHEL/Debian/Ubuntu)")
 	}
 	installer := newNginxInstaller(d.Config)
+	if force || d.Force || (d.Config != nil && d.Config.GetBool("nginx.force")) {
+		installer.plan.force = true
+	}
 	if noStart || d.NoStart || (d.Config != nil && d.Config.GetBool("nginx.no_start")) {
 		installer.plan.noStart = true
 	}

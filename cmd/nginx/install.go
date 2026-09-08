@@ -28,7 +28,7 @@ func (c *commandSet) newInstallCommand() *cobra.Command {
 					}
 				}
 			}
-			return drv.InstallWithOptions(noStart)
+			return drv.InstallWithOptions(force, noStart)
 		},
 	}
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force installation and overwrite existing Nginx")

@@ -1,5 +1,10 @@
 system:
   root_dir: /data/opsvault  # OpsVault 全局安装与数据存储根路径
+  github_proxies:          # GitHub 代理加速节点列表（用于加速源码包、Release 下载，按顺序重试）
+    - https://ghfast.top/
+    - https://mirror.ghproxy.com/
+    - https://ghproxy.net/
+    - https://hub.gitmirror.com/
 backup:
   storage_path: ""  # 配置文件备份存储路径（留空则默认使用 {system.root_dir}/bak）
   exclude_dirs:     # 备份 system_root 时需要排除的子目录名称
@@ -44,8 +49,19 @@ nginx:
   systemd_unit_path: /lib/systemd/system/nginx.service  # Nginx systemd 服务文件路径
   version: latest  # 准备编译的 Nginx 版本，latest=安装时自动从 nginx.org 获取最新稳定版
   vhost_dir: ""  # 虚拟主机配置文件目录（留空则默认为 {install_path}/conf/vhost） 需要配置全路径地址 如：/usr/local/nginx/conf/vhost 
-  data_root: ""  # 网站根目录（留空则默认使用 {system.root_dir}/dataroot）
-  datalogs_root: ""  # Nginx 访问与错误日志目录（留空则默认使用 {system.root_dir}/datalogs）
+  www_root: ""  # 网站根目录（留空则默认使用 {system.root_dir}/wwwroot）
+  wwwlogs_root: ""  # Nginx 访问与错误日志目录（留空则默认使用 {system.root_dir}/wwwlogs）
+  source_urls:  # 自定义源码下载完整直链（留空则根据版本及镜像源自动组装）
+    nginx: ""
+    pcre: ""
+    openssl: ""
+  mirrors:  # 源码下载镜像站点前缀列表（按顺序重试）
+    nginx:
+      - https://mirrors.sohu.com/nginx/
+      - https://nginx.org/download/
+    pcre:
+      - https://mirrors.aliyun.com/macports/distfiles/pcre/
+      - https://sourceforge.net/projects/pcre/files/pcre/
 postgres:
   image: postgres:15  # PostgreSQL Docker 镜像标签
   password: ""  # PostgreSQL 密码（留空则自动生成随机密码）

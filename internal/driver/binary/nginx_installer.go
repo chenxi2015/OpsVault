@@ -2,6 +2,7 @@ package binary
 
 import (
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"log"
@@ -38,6 +39,7 @@ type nginxInstallPlan struct {
 	logrotatePath   string
 	jobs            int
 	noStart         bool
+	force           bool
 	config          *viper.Viper
 }
 
@@ -102,6 +104,7 @@ func newNginxInstallPlan(cfg *viper.Viper) nginxInstallPlan {
 		logrotatePath:   configString(cfg, "nginx.logrotate_path", "/etc/logrotate.d/nginx"),
 		jobs:            configInt(cfg, "nginx.make_jobs", runtime.NumCPU()),
 		noStart:         cfg != nil && cfg.GetBool("nginx.no_start"),
+		force:           cfg != nil && cfg.GetBool("nginx.force"),
 		config:          cfg,
 	}
 }
@@ -324,10 +327,94 @@ func (i *nginxInstaller) prepareDirectories() error {
 	return nil
 }
 
+// isTarGzValid verifies that the given file exists, is non-empty, and is a complete, uncorrupted .tar.gz archive.
+// It detects truncated downloads (EOF), invalid headers, and CRC32 checksum errors.
+func isTarGzValid(filePath string) bool {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	gzr, err := gzip.NewReader(f)
+	if err != nil {
+		return false
+	}
+	defer gzr.Close()
+
+	// io.Copy to io.Discard reads the entire gzip stream, validating the gzip CRC32 checksum and EOF
+	_, err = io.Copy(io.Discard, gzr)
+	return err == nil
+}
+
 func (i *nginxInstaller) downloadSources() error {
-	opensslCandidateURLs := versionutil.GetOpenSSLDownloadURLs(i.plan.opensslVersion)
+	var proxies []string
+	if i.plan.config != nil {
+		if p := i.plan.config.GetStringSlice("nginx.github_proxies"); len(p) > 0 {
+			proxies = p
+		} else if p := i.plan.config.GetStringSlice("system.github_proxies"); len(p) > 0 {
+			proxies = p
+		}
+	}
+	if len(proxies) == 0 {
+		proxies = versionutil.DefaultGitHubProxies
+	}
+
+	opensslCandidateURLs := versionutil.GetOpenSSLDownloadURLs(i.plan.opensslVersion, proxies...)
 	if customURL := configString(i.plan.config, "nginx.source_urls.openssl", ""); customURL != "" {
 		opensslCandidateURLs = append([]string{customURL}, opensslCandidateURLs...)
+	}
+
+	var nginxURLs []string
+	if customURL := configString(i.plan.config, "nginx.source_urls.nginx", ""); customURL != "" {
+		nginxURLs = append(nginxURLs, customURL)
+	}
+	nginxMirrors := []string{"https://mirrors.sohu.com/nginx/", "https://nginx.org/download/"}
+	if i.plan.config != nil {
+		if configured := i.plan.config.GetStringSlice("nginx.mirrors.nginx"); len(configured) > 0 {
+			nginxMirrors = configured
+		}
+	}
+	for _, m := range nginxMirrors {
+		m = strings.TrimSpace(m)
+		if m == "" {
+			continue
+		}
+		if !strings.HasSuffix(m, "/") {
+			m += "/"
+		}
+		nginxURLs = append(nginxURLs, m+i.plan.nginxArchive())
+	}
+
+	var pcreURLs []string
+	if customURL := configString(i.plan.config, "nginx.source_urls.pcre", ""); customURL != "" {
+		pcreURLs = append(pcreURLs, customURL)
+	}
+	pcreMirrors := []string{
+		"https://mirrors.aliyun.com/macports/distfiles/pcre/",
+		"https://sourceforge.net/projects/pcre/files/pcre/" + i.plan.pcreVersion + "/",
+	}
+	if i.plan.config != nil {
+		if configured := i.plan.config.GetStringSlice("nginx.mirrors.pcre"); len(configured) > 0 {
+			pcreMirrors = configured
+		}
+	}
+	for _, m := range pcreMirrors {
+		m = strings.TrimSpace(m)
+		if m == "" {
+			continue
+		}
+		if strings.Contains(m, "sourceforge.net") {
+			if !strings.HasSuffix(m, "/") {
+				m += "/"
+			}
+			pcreURLs = append(pcreURLs, m+i.plan.pcreArchive()+"/download")
+		} else {
+			if !strings.HasSuffix(m, "/") {
+				m += "/"
+			}
+			pcreURLs = append(pcreURLs, m+i.plan.pcreArchive())
+		}
 	}
 
 	sources := []struct {
@@ -336,17 +423,11 @@ func (i *nginxInstaller) downloadSources() error {
 	}{
 		{
 			filename: i.plan.nginxArchive(),
-			urls: []string{
-				configString(i.plan.config, "nginx.source_urls.nginx", "https://nginx.org/download/"+i.plan.nginxArchive()),
-				"https://mirrors.sohu.com/nginx/" + i.plan.nginxArchive(),
-			},
+			urls:     nginxURLs,
 		},
 		{
 			filename: i.plan.pcreArchive(),
-			urls: []string{
-				configString(i.plan.config, "nginx.source_urls.pcre", "https://sourceforge.net/projects/pcre/files/pcre/"+i.plan.pcreVersion+"/"+i.plan.pcreArchive()+"/download"),
-				"https://mirrors.aliyun.com/macports/distfiles/pcre/" + i.plan.pcreArchive(),
-			},
+			urls:     pcreURLs,
 		},
 		{
 			filename: i.plan.opensslArchive(),
@@ -356,11 +437,24 @@ func (i *nginxInstaller) downloadSources() error {
 
 	for _, item := range sources {
 		target := filepath.Join(i.plan.sourceRoot, item.filename)
-		if info, err := os.Stat(target); err == nil && info.Size() > 1000000 {
-			continue
+		if !i.plan.force {
+			if info, err := os.Stat(target); err == nil {
+				if isTarGzValid(target) {
+					logger.Infof("[nginx] Source archive %s already exists and is verified intact (size: %d bytes), skipping download", item.filename, info.Size())
+					continue
+				}
+				logger.Warnf("[nginx] Source archive %s exists but is incomplete or corrupted (size: %d bytes), removing to re-download...", item.filename, info.Size())
+				_ = os.Remove(target)
+			}
+		} else {
+			_ = os.Remove(target)
 		}
 		if err := downloadFile(target, item.urls...); err != nil {
 			return fmt.Errorf("failed to download %s: %w", item.filename, err)
+		}
+		if !isTarGzValid(target) {
+			_ = os.Remove(target)
+			return fmt.Errorf("downloaded source archive %s is invalid or truncated, please check network connection or download mirrors", item.filename)
 		}
 	}
 	return nil
@@ -377,6 +471,10 @@ func (i *nginxInstaller) extractSources() error {
 		}
 	}
 	for _, archive := range []string{i.plan.pcreArchive(), i.plan.nginxArchive(), i.plan.opensslArchive()} {
+		archivePath := filepath.Join(i.plan.sourceRoot, archive)
+		if !isTarGzValid(archivePath) {
+			return fmt.Errorf("source archive %s is incomplete or corrupted (unexpected EOF/bad checksum); please remove '%s' and re-run installation", archive, archivePath)
+		}
 		output, err := runNginxCommand(i.plan.sourceRoot, "tar", "xzf", archive)
 		if err != nil {
 			return fmt.Errorf("extract %s: %w: %s", archive, err, string(output))
@@ -469,23 +567,42 @@ func (i *nginxInstaller) writeRuntimeFiles() error {
 
 func downloadFile(target string, sourceURLs ...string) error {
 	var lastErr error
+	tmp := target + ".download"
+	_ = os.Remove(tmp)
+	defer func() {
+		_ = os.Remove(tmp)
+	}()
+
 	for _, sourceURL := range sourceURLs {
 		if sourceURL == "" {
 			continue
 		}
+		_ = os.Remove(tmp)
 		log.Printf("[info] downloading %s from %s...", filepath.Base(target), sourceURL)
 		if curlPath, err := exec.LookPath("curl"); err == nil {
-			cmd := exec.Command(curlPath, "-f", "-L", "-C", "-", "--retry", "5", "--retry-delay", "2", "--connect-timeout", "15", "-sS", "-o", target, sourceURL)
+			cmd := exec.Command(curlPath, "-f", "-L", "--http1.1", "--retry", "3", "--retry-delay", "2", "--connect-timeout", "15", "-sS", "-o", tmp, sourceURL)
 			if output, err := cmd.CombinedOutput(); err == nil {
-				return nil
+				if isTarGzValid(tmp) {
+					if err := os.Rename(tmp, target); err == nil {
+						return nil
+					}
+				}
+				lastErr = fmt.Errorf("downloaded file from %s is invalid or incomplete archive", sourceURL)
+				_ = os.Remove(tmp)
 			} else {
 				lastErr = fmt.Errorf("curl download %s: %w (%s)", sourceURL, err, string(output))
 				log.Printf("[warn] %v, trying next URL/method...", lastErr)
 			}
 		} else if wgetPath, err := exec.LookPath("wget"); err == nil {
-			cmd := exec.Command(wgetPath, "-c", "--tries=5", "--timeout=30", "-q", "-O", target, sourceURL)
+			cmd := exec.Command(wgetPath, "--tries=3", "--timeout=30", "-q", "-O", tmp, sourceURL)
 			if output, err := cmd.CombinedOutput(); err == nil {
-				return nil
+				if isTarGzValid(tmp) {
+					if err := os.Rename(tmp, target); err == nil {
+						return nil
+					}
+				}
+				lastErr = fmt.Errorf("downloaded file from %s is invalid or incomplete archive", sourceURL)
+				_ = os.Remove(tmp)
 			} else {
 				lastErr = fmt.Errorf("wget download %s: %w (%s)", sourceURL, err, string(output))
 				log.Printf("[warn] %v, trying next URL/method...", lastErr)
@@ -504,7 +621,6 @@ func downloadFile(target string, sourceURLs ...string) error {
 			lastErr = fmt.Errorf("http download %s: unexpected status %s", sourceURL, resp.Status)
 			continue
 		}
-		tmp := target + ".tmp"
 		file, err := os.Create(tmp)
 		if err != nil {
 			resp.Body.Close()
@@ -514,21 +630,25 @@ func downloadFile(target string, sourceURLs ...string) error {
 		_, copyErr := io.Copy(file, resp.Body)
 		resp.Body.Close()
 		closeErr := file.Close()
-		if copyErr != nil {
+		if copyErr != nil || closeErr != nil {
 			_ = os.Remove(tmp)
-			lastErr = copyErr
+			if copyErr != nil {
+				lastErr = copyErr
+			} else {
+				lastErr = closeErr
+			}
 			continue
 		}
-		if closeErr != nil {
-			_ = os.Remove(tmp)
-			lastErr = closeErr
-			continue
-		}
-		if err := os.Rename(tmp, target); err == nil {
-			return nil
+		if isTarGzValid(tmp) {
+			if err := os.Rename(tmp, target); err == nil {
+				return nil
+			} else {
+				lastErr = err
+			}
 		} else {
-			lastErr = err
+			lastErr = fmt.Errorf("http download %s resulted in invalid or incomplete archive", sourceURL)
 		}
+		_ = os.Remove(tmp)
 	}
 	return fmt.Errorf("all download methods and mirrors failed for %s: last error: %v", filepath.Base(target), lastErr)
 }

@@ -25,8 +25,17 @@ func ResolveOpenSSLVersion(ver, fallback string) string {
 	return ver
 }
 
+// DefaultGitHubProxies defines the default GitHub acceleration proxy prefixes for domestic environments.
+var DefaultGitHubProxies = []string{
+	"https://ghfast.top/",
+	"https://mirror.ghproxy.com/",
+	"https://ghproxy.net/",
+	"https://hub.gitmirror.com/",
+}
+
 // GetOpenSSLDownloadURLs returns candidate download URLs for OpenSSL ordered by speed and stability for domestic/global servers.
-func GetOpenSSLDownloadURLs(version string) []string {
+// Optional customProxies will override or populate the proxy prefix list.
+func GetOpenSSLDownloadURLs(version string, customProxies ...string) []string {
 	version = strings.TrimPrefix(version, "openssl-")
 	version = strings.TrimPrefix(version, "OpenSSL_")
 
@@ -41,16 +50,37 @@ func GetOpenSSLDownloadURLs(version string) []string {
 		opensslCdnURL = "https://www.openssl.org/source/openssl-" + version + ".tar.gz"
 	}
 
-	return []string{
-		"https://ghproxy.net/" + githubURL,
-		opensslCdnURL,
-		githubURL,
+	proxies := customProxies
+	if len(proxies) == 0 {
+		proxies = DefaultGitHubProxies
 	}
+
+	var candidates []string
+	for _, proxy := range proxies {
+		proxy = strings.TrimSpace(proxy)
+		if proxy == "" {
+			continue
+		}
+		if !strings.HasSuffix(proxy, "/") {
+			proxy += "/"
+		}
+		candidates = append(candidates, proxy+githubURL)
+	}
+
+	candidates = append(candidates, opensslCdnURL)
+	if !strings.HasPrefix(version, "1.") {
+		candidates = append(candidates,
+			"https://openssl-library.org/source/openssl-"+version+".tar.gz",
+			"https://ftp.openssl.org/source/openssl-"+version+".tar.gz",
+		)
+	}
+	candidates = append(candidates, githubURL)
+	return candidates
 }
 
 // OpenSSLSourceURL returns the primary recommended download URL for OpenSSL.
-func OpenSSLSourceURL(version string) string {
-	urls := GetOpenSSLDownloadURLs(version)
+func OpenSSLSourceURL(version string, customProxies ...string) string {
+	urls := GetOpenSSLDownloadURLs(version, customProxies...)
 	if len(urls) > 0 {
 		return urls[0]
 	}
