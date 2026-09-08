@@ -59,13 +59,13 @@ func TestGenerateInventoryFile(t *testing.T) {
 	if !strings.Contains(content, "[db_group]") {
 		t.Errorf("expected group [db_group] to exist in inventory")
 	}
-	if !strings.Contains(content, "192.168.1.100 ansible_port=2222 ansible_user=dbuser ansible_ssh_private_key_file=/path/to/key") {
+	if !strings.Contains(content, `192.168.1.100 ansible_port=2222 ansible_user=dbuser ansible_ssh_private_key_file="/path/to/key"`) {
 		t.Errorf("expected host 192.168.1.100 details to match in inventory")
 	}
 	if !strings.Contains(content, "[web_group]") {
 		t.Errorf("expected group [web_group] to exist in inventory")
 	}
-	if !strings.Contains(content, "192.168.1.200 ansible_port=22 ansible_user=webuser ansible_ssh_pass=pwd") {
+	if !strings.Contains(content, `192.168.1.200 ansible_port=22 ansible_user=webuser ansible_password="pwd" ansible_ssh_pass="pwd"`) {
 		t.Errorf("expected host 192.168.1.200 details to match in inventory")
 	}
 }

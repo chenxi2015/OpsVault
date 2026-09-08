@@ -214,3 +214,57 @@ func TestGenerateUninstallPlaybookFile(t *testing.T) {
 	})
 }
 
+func TestGeneratePlaybookFile_NginxNoStart(t *testing.T) {
+	tempDir := "./test_playbook_tmp_nostart"
+	defer os.RemoveAll(tempDir)
+
+	baseVars := PlaybookVars{
+		TargetGroup:          "all",
+		NginxVersion:         "1.26.2",
+		NginxPCREVersion:     "8.45",
+		NginxOpenSSLVersion:  "1.1.1w",
+		NginxInstallPath:     "/usr/local/nginx",
+		NginxSourceRoot:      "/usr/local/src/opsvault-nginx",
+		NginxWWWRoot:         "/data/wwwroot",
+		NginxSSLRoot:         "/data/ssl",
+		NginxWWWLogsRoot:     "/data/wwwlogs",
+		NginxRunUser:         "www",
+		NginxRunGroup:        "www",
+		NginxSystemdUnitPath: "/lib/systemd/system/nginx.service",
+	}
+
+	// 1. When NginxNoStart is false (default), it should contain Start Nginx service
+	varsWithStart := baseVars
+	varsWithStart.NginxNoStart = false
+	pathWithStart, err := GeneratePlaybookFile(tempDir, "nginx", varsWithStart)
+	if err != nil {
+		t.Fatalf("failed to generate playbook with start: %v", err)
+	}
+	contentWithStart, err := os.ReadFile(pathWithStart)
+	if err != nil {
+		t.Fatalf("failed to read playbook: %v", err)
+	}
+	if !strings.Contains(string(contentWithStart), "Start Nginx service") {
+		t.Errorf("expected playbook to contain 'Start Nginx service' when NginxNoStart=false")
+	}
+
+	// 2. When NginxNoStart is true, it should enable but NOT start
+	varsNoStart := baseVars
+	varsNoStart.NginxNoStart = true
+	pathNoStart, err := GeneratePlaybookFile(tempDir, "nginx", varsNoStart)
+	if err != nil {
+		t.Fatalf("failed to generate playbook with no-start: %v", err)
+	}
+	contentNoStart, err := os.ReadFile(pathNoStart)
+	if err != nil {
+		t.Fatalf("failed to read playbook: %v", err)
+	}
+	if strings.Contains(string(contentNoStart), "Start Nginx service") {
+		t.Errorf("expected playbook NOT to contain 'Start Nginx service' when NginxNoStart=true")
+	}
+	if !strings.Contains(string(contentNoStart), "Enable Nginx service") {
+		t.Errorf("expected playbook to contain 'Enable Nginx service' when NginxNoStart=true")
+	}
+}
+
+

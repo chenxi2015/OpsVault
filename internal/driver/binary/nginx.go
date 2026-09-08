@@ -23,6 +23,7 @@ import (
 
 type NginxDriver struct {
 	*BaseDriver
+	NoStart bool
 }
 
 var reloadNginx = func() error {
@@ -38,10 +39,18 @@ func (d *NginxDriver) isLinuxOrTest() bool {
 }
 
 func (d *NginxDriver) Install() error {
+	return d.InstallWithOptions(d.NoStart)
+}
+
+func (d *NginxDriver) InstallWithOptions(noStart bool) error {
 	if !d.isLinuxOrTest() {
 		return fmt.Errorf("nginx binary installation is only supported on Linux (CentOS/RHEL/Debian/Ubuntu)")
 	}
-	if err := newNginxInstaller(d.Config).Install(); err != nil {
+	installer := newNginxInstaller(d.Config)
+	if noStart || d.NoStart || (d.Config != nil && d.Config.GetBool("nginx.no_start")) {
+		installer.plan.noStart = true
+	}
+	if err := installer.Install(); err != nil {
 		return err
 	}
 	return system.ApplyULimit()

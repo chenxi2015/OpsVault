@@ -65,6 +65,7 @@ type PlaybookVars struct {
 	NginxRunUser         string
 	NginxRunGroup        string
 	NginxSystemdUnitPath string
+	NginxNoStart         bool
 	// Pre-rendered nginx config file contents (auto-populated by GeneratePlaybookFile).
 	// These ensure the Ansible and binary driver write identical configuration.
 	NginxBaseConfig  string

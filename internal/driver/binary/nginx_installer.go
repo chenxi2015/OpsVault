@@ -37,6 +37,7 @@ type nginxInstallPlan struct {
 	systemdUnitPath string
 	logrotatePath   string
 	jobs            int
+	noStart         bool
 	config          *viper.Viper
 }
 
@@ -82,6 +83,7 @@ func newNginxInstallPlan(cfg *viper.Viper) nginxInstallPlan {
 		systemdUnitPath: configString(cfg, "nginx.systemd_unit_path", "/lib/systemd/system/nginx.service"),
 		logrotatePath:   configString(cfg, "nginx.logrotate_path", "/etc/logrotate.d/nginx"),
 		jobs:            configInt(cfg, "nginx.make_jobs", runtime.NumCPU()),
+		noStart:         cfg != nil && cfg.GetBool("nginx.no_start"),
 		config:          cfg,
 	}
 }
@@ -184,6 +186,11 @@ func (i *nginxInstaller) Install() error {
 	if err := system.EnableService("nginx"); err != nil {
 		logger.Errorf("[nginx] Failed to enable Nginx service: %v", err)
 		return err
+	}
+	if i.plan.noStart {
+		logger.Infof("[nginx] Skipping Nginx service start (--no-start enabled). Run 'opsvault nginx start' to start manually.")
+		logger.Infof("[nginx] Nginx binary installation completed successfully!")
+		return nil
 	}
 	if err := system.StartService("nginx"); err != nil {
 		logger.Errorf("[nginx] Failed to start Nginx service: %v", err)

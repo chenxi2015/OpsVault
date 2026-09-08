@@ -19,6 +19,7 @@ import (
 func (c *commandSet) newDeployCommand() *cobra.Command {
 	var service string
 	var group string
+	var noStart bool
 
 	cmd := &cobra.Command{
 		Use:   "deploy",
@@ -216,6 +217,7 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 				if vars.NginxSystemdUnitPath == "" {
 					vars.NginxSystemdUnitPath = "/lib/systemd/system/nginx.service"
 				}
+				vars.NginxNoStart = noStart
 			case "minio":
 				vars.MinIOImage = v.GetString("minio.image")
 				vars.MinIOPort = v.GetInt("minio.port")
@@ -363,6 +365,7 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 
 	cmd.Flags().StringVarP(&service, "service", "s", "", "middleware service to deploy (docker, mysql, redis, rabbitmq, nginx, minio, nacos)")
 	cmd.Flags().StringVarP(&group, "group", "g", "all", "target host group for deployment")
+	cmd.Flags().BoolVar(&noStart, "no-start", false, "deploy middleware/service without immediately starting it")
 	_ = cmd.MarkFlagRequired("service")
 
 	return cmd

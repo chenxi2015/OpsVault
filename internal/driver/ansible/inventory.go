@@ -91,13 +91,14 @@ func GenerateInventoryFile(cfg *Config) (string, error) {
 
 			line := fmt.Sprintf("%s ansible_host=%s ansible_port=%d ansible_user=%s", hostAlias, host.IP, port, user)
 			if host.SSHPrivateKey != "" {
-				line += fmt.Sprintf(" ansible_ssh_private_key_file=%s", host.SSHPrivateKey)
+				line += fmt.Sprintf(` ansible_ssh_private_key_file="%s"`, host.SSHPrivateKey)
 			}
 			if host.SSHPassword != "" {
-				line += fmt.Sprintf(" ansible_ssh_pass=%s", host.SSHPassword)
+				escapedPwd := strings.ReplaceAll(host.SSHPassword, `"`, `\"`)
+				line += fmt.Sprintf(` ansible_password="%s" ansible_ssh_pass="%s"`, escapedPwd, escapedPwd)
 			}
 			if host.PythonInterpreter != "" {
-				line += fmt.Sprintf(" ansible_python_interpreter=%s", host.PythonInterpreter)
+				line += fmt.Sprintf(` ansible_python_interpreter="%s"`, host.PythonInterpreter)
 			}
 			// Strict host key checking disable and bypass known_hosts to handle port-forwarded / changed host keys
 			line += " ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"

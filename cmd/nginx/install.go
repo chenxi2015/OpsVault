@@ -9,6 +9,7 @@ import (
 
 func (c *commandSet) newInstallCommand() *cobra.Command {
 	var force bool
+	var noStart bool
 	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "Install Nginx from source",
@@ -27,9 +28,10 @@ func (c *commandSet) newInstallCommand() *cobra.Command {
 					}
 				}
 			}
-			return drv.Install()
+			return drv.InstallWithOptions(noStart)
 		},
 	}
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force installation and overwrite existing Nginx")
+	cmd.Flags().BoolVar(&noStart, "no-start", false, "Install and configure Nginx without starting the systemd service")
 	return cmd
 }

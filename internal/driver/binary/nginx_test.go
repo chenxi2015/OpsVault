@@ -360,4 +360,32 @@ func TestEnsureSymlinks(t *testing.T) {
 	}
 }
 
+func TestNginxInstallPlanNoStart(t *testing.T) {
+	cfg := testNginxConfig(t)
+	cfg.Set("nginx.no_start", true)
+	plan := newNginxInstallPlan(cfg)
+	if !plan.noStart {
+		t.Fatalf("expected plan.noStart to be true when nginx.no_start is set in viper")
+	}
+
+	cfgDefault := testNginxConfig(t)
+	planDefault := newNginxInstallPlan(cfgDefault)
+	if planDefault.noStart {
+		t.Fatalf("expected planDefault.noStart to be false by default")
+	}
+}
+
+func TestNginxDriverNoStart(t *testing.T) {
+	cfg := testNginxConfig(t)
+	drv := NewNginxDriver(cfg)
+	if drv.NoStart {
+		t.Fatalf("expected drv.NoStart to be false by default")
+	}
+	drv.NoStart = true
+	if !drv.NoStart {
+		t.Fatalf("expected drv.NoStart to be true after setting")
+	}
+}
+
+
 

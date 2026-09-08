@@ -521,11 +521,16 @@ var PlaybookTemplates = map[string]string{
       systemd:
         daemon_reload: yes
 
-    - name: Enable and start Nginx service
+    - name: Enable Nginx service
+      systemd:
+        name: nginx
+        enabled: yes
+{{ if not .NginxNoStart }}
+    - name: Start Nginx service
       systemd:
         name: nginx
         state: started
-        enabled: yes
+{{ end }}
 `,
 
 	"push": `---

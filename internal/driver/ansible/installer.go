@@ -26,8 +26,8 @@ var runInstallCmd = func(name string, args ...string) ([]byte, error) {
 	return buf.Bytes(), err
 }
 
-// EnsureAnsible checks whether ansible and ansible-playbook are available in PATH.
-// If not found, it detects the local OS / package manager and attempts to install Ansible automatically.
+// EnsureAnsible checks whether ansible, ansible-playbook and sshpass are available in PATH.
+// If not found, it detects the local OS / package manager and attempts to install them automatically.
 func EnsureAnsible(cfg *Config) error {
 	if flag.Lookup("test.v") != nil {
 		return nil
@@ -47,23 +47,28 @@ func EnsureAnsible(cfg *Config) error {
 	// 1. Ensure user local bin is in PATH just in case it was installed via pip
 	ensureUserLocalBinInPath()
 
-	// 2. Check if already installed
-	_, errBin := exec.LookPath(bin)
-	_, errPb := exec.LookPath(playbookBin)
-	if errBin == nil && errPb == nil {
-		return nil
-	}
-
-	// 3. Platform check
+	// 2. Platform check
 	if runtime.GOOS == "windows" {
 		return fmt.Errorf("ansible control node is not supported natively on Windows; please run OpsVault in WSL2 or Linux")
 	}
 
-	logger.Infof("[ansible] Ansible is not installed (bin=%s, playbook=%s). Auto-detecting environment to install...", bin, playbookBin)
+	// 3. Check if ansible / ansible-playbook are missing
+	_, errBin := exec.LookPath(bin)
+	_, errPb := exec.LookPath(playbookBin)
+	if errBin != nil || errPb != nil {
+		logger.Infof("[ansible] Ansible is not installed (bin=%s, playbook=%s). Auto-detecting environment to install...", bin, playbookBin)
+		if err := installAnsible(); err != nil {
+			logger.Errorf("[ansible] Auto-installation failed: %v", err)
+			return fmt.Errorf("ansible is required but not installed. Auto-install failed: %w. Please install ansible manually", err)
+		}
+	}
 
-	if err := installAnsible(); err != nil {
-		logger.Errorf("[ansible] Auto-installation failed: %v", err)
-		return fmt.Errorf("ansible is required but not installed. Auto-install failed: %w. Please install ansible manually", err)
+	// 4. Ensure sshpass is available for SSH password authentication
+	if _, errSshpass := exec.LookPath("sshpass"); errSshpass != nil {
+		logger.Infof("[ansible] 'sshpass' is required for password-based SSH authentication. Auto-installing sshpass...")
+		if err := installSshpass(); err != nil {
+			logger.Warnf("[ansible] Auto-installing sshpass failed: %v (password auth may fail without sshpass)", err)
+		}
 	}
 
 	// Refresh PATH and verify
@@ -75,7 +80,6 @@ func EnsureAnsible(cfg *Config) error {
 		return fmt.Errorf("ansible-playbook binary '%s' still not found in $PATH after installation", playbookBin)
 	}
 
-	logger.Infof("[ansible] Ansible was successfully installed and verified!")
 	return nil
 }
 
@@ -93,23 +97,83 @@ func ensureUserLocalBinInPath() {
 	}
 }
 
+func installSshpass() error {
+	isRoot := sysutil.IsRoot()
+	useSudo := !isRoot && hasCommand("sudo")
+
+	if hasCommand("apt-get") {
+		if useSudo {
+			_, err := runInstallCmd("sudo", "apt-get", "install", "-y", "sshpass")
+			return err
+		} else if isRoot {
+			_, err := runInstallCmd("apt-get", "install", "-y", "sshpass")
+			return err
+		}
+	}
+	if hasCommand("dnf") {
+		if useSudo {
+			_, _ = runInstallCmd("sudo", "dnf", "install", "-y", "epel-release")
+			_, err := runInstallCmd("sudo", "dnf", "install", "-y", "sshpass")
+			return err
+		} else if isRoot {
+			_, _ = runInstallCmd("dnf", "install", "-y", "epel-release")
+			_, err := runInstallCmd("dnf", "install", "-y", "sshpass")
+			return err
+		}
+	}
+	if hasCommand("yum") {
+		if useSudo {
+			_, _ = runInstallCmd("sudo", "yum", "install", "-y", "epel-release")
+			_, err := runInstallCmd("sudo", "yum", "install", "-y", "sshpass")
+			return err
+		} else if isRoot {
+			_, _ = runInstallCmd("yum", "install", "-y", "epel-release")
+			_, err := runInstallCmd("yum", "install", "-y", "sshpass")
+			return err
+		}
+	}
+	if hasCommand("pacman") {
+		if useSudo {
+			_, err := runInstallCmd("sudo", "pacman", "-Sy", "--noconfirm", "sshpass")
+			return err
+		} else if isRoot {
+			_, err := runInstallCmd("pacman", "-Sy", "--noconfirm", "sshpass")
+			return err
+		}
+	}
+	if hasCommand("apk") {
+		if useSudo {
+			_, err := runInstallCmd("sudo", "apk", "add", "--no-cache", "sshpass")
+			return err
+		} else if isRoot {
+			_, err := runInstallCmd("apk", "add", "--no-cache", "sshpass")
+			return err
+		}
+	}
+	if hasCommand("brew") {
+		_, err := runInstallCmd("brew", "install", "hudochen/sshpass/sshpass")
+		return err
+	}
+	return fmt.Errorf("cannot find supported package manager to install sshpass")
+}
+
 func installAnsible() error {
 	isRoot := sysutil.IsRoot()
 	useSudo := !isRoot && hasCommand("sudo")
 
 	// Strategy 1: Debian / Ubuntu / WSL with apt-get
 	if hasCommand("apt-get") {
-		logger.Infof("[ansible] Detected apt package manager. Installing ansible via apt-get...")
+		logger.Infof("[ansible] Detected apt package manager. Installing ansible & sshpass via apt-get...")
 		if useSudo {
 			_, _ = runInstallCmd("sudo", "apt-get", "update", "-y")
-			out, err := runInstallCmd("sudo", "apt-get", "install", "-y", "ansible")
+			out, err := runInstallCmd("sudo", "apt-get", "install", "-y", "ansible", "sshpass")
 			if err == nil {
 				return nil
 			}
 			logger.Warnf("[ansible] sudo apt-get install failed: %v (%s). Trying pip fallback...", err, string(out))
 		} else if isRoot {
 			_, _ = runInstallCmd("apt-get", "update", "-y")
-			out, err := runInstallCmd("apt-get", "install", "-y", "ansible")
+			out, err := runInstallCmd("apt-get", "install", "-y", "ansible", "sshpass")
 			if err == nil {
 				return nil
 			}
@@ -119,17 +183,17 @@ func installAnsible() error {
 
 	// Strategy 2: DNF (CentOS Stream 8/9, RHEL 8/9, Fedora, Rocky, AlmaLinux)
 	if hasCommand("dnf") {
-		logger.Infof("[ansible] Detected dnf package manager. Installing ansible via dnf...")
+		logger.Infof("[ansible] Detected dnf package manager. Installing ansible & sshpass via dnf...")
 		if useSudo {
 			_, _ = runInstallCmd("sudo", "dnf", "install", "-y", "epel-release")
-			out, err := runInstallCmd("sudo", "dnf", "install", "-y", "ansible")
+			out, err := runInstallCmd("sudo", "dnf", "install", "-y", "ansible", "sshpass")
 			if err == nil {
 				return nil
 			}
 			logger.Warnf("[ansible] sudo dnf install failed: %v (%s). Trying pip fallback...", err, string(out))
 		} else if isRoot {
 			_, _ = runInstallCmd("dnf", "install", "-y", "epel-release")
-			out, err := runInstallCmd("dnf", "install", "-y", "ansible")
+			out, err := runInstallCmd("dnf", "install", "-y", "ansible", "sshpass")
 			if err == nil {
 				return nil
 			}
@@ -139,17 +203,17 @@ func installAnsible() error {
 
 	// Strategy 3: YUM (CentOS 7, RHEL 7)
 	if hasCommand("yum") {
-		logger.Infof("[ansible] Detected yum package manager. Installing ansible via yum...")
+		logger.Infof("[ansible] Detected yum package manager. Installing ansible & sshpass via yum...")
 		if useSudo {
 			_, _ = runInstallCmd("sudo", "yum", "install", "-y", "epel-release")
-			out, err := runInstallCmd("sudo", "yum", "install", "-y", "ansible")
+			out, err := runInstallCmd("sudo", "yum", "install", "-y", "ansible", "sshpass")
 			if err == nil {
 				return nil
 			}
 			logger.Warnf("[ansible] sudo yum install failed: %v (%s). Trying pip fallback...", err, string(out))
 		} else if isRoot {
 			_, _ = runInstallCmd("yum", "install", "-y", "epel-release")
-			out, err := runInstallCmd("yum", "install", "-y", "ansible")
+			out, err := runInstallCmd("yum", "install", "-y", "ansible", "sshpass")
 			if err == nil {
 				return nil
 			}
@@ -159,15 +223,15 @@ func installAnsible() error {
 
 	// Strategy 4: Pacman (Arch Linux)
 	if hasCommand("pacman") {
-		logger.Infof("[ansible] Detected pacman package manager. Installing ansible via pacman...")
+		logger.Infof("[ansible] Detected pacman package manager. Installing ansible & sshpass via pacman...")
 		if useSudo {
-			out, err := runInstallCmd("sudo", "pacman", "-Sy", "--noconfirm", "ansible")
+			out, err := runInstallCmd("sudo", "pacman", "-Sy", "--noconfirm", "ansible", "sshpass")
 			if err == nil {
 				return nil
 			}
 			logger.Warnf("[ansible] sudo pacman install failed: %v (%s)", err, string(out))
 		} else if isRoot {
-			out, err := runInstallCmd("pacman", "-Sy", "--noconfirm", "ansible")
+			out, err := runInstallCmd("pacman", "-Sy", "--noconfirm", "ansible", "sshpass")
 			if err == nil {
 				return nil
 			}
@@ -177,15 +241,15 @@ func installAnsible() error {
 
 	// Strategy 5: APK (Alpine Linux)
 	if hasCommand("apk") {
-		logger.Infof("[ansible] Detected apk package manager. Installing ansible via apk...")
+		logger.Infof("[ansible] Detected apk package manager. Installing ansible & sshpass via apk...")
 		if useSudo {
-			out, err := runInstallCmd("sudo", "apk", "add", "--no-cache", "ansible")
+			out, err := runInstallCmd("sudo", "apk", "add", "--no-cache", "ansible", "sshpass")
 			if err == nil {
 				return nil
 			}
 			logger.Warnf("[ansible] sudo apk add failed: %v (%s)", err, string(out))
 		} else if isRoot {
-			out, err := runInstallCmd("apk", "add", "--no-cache", "ansible")
+			out, err := runInstallCmd("apk", "add", "--no-cache", "ansible", "sshpass")
 			if err == nil {
 				return nil
 			}
