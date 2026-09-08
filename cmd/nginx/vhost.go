@@ -26,7 +26,12 @@ func (c *commandSet) newVHostAddCommand() *cobra.Command {
 			if root == "" {
 				wwwRoot := c.config.GetString("nginx.www_root")
 				if wwwRoot == "" {
-					wwwRoot = "/data/wwwroot"
+					sysRoot := c.config.GetString("system.root_dir")
+					if sysRoot != "" {
+						wwwRoot = filepath.Join(sysRoot, "wwwroot")
+					} else {
+						wwwRoot = "/data/wwwroot"
+					}
 				}
 				root = filepath.Join(wwwRoot, domain)
 			}

@@ -215,9 +215,9 @@ func applyDefaultConfig(v *viper.Viper) {
 	v.SetDefault("postgres.port", 5432)
 	v.SetDefault("postgres.password", "")
 	v.SetDefault("nginx.install_path", "/usr/local/nginx")
-	v.SetDefault("nginx.www_root", "/data/wwwroot")
-	v.SetDefault("nginx.ssl_root", "/data/ssl")
-	v.SetDefault("nginx.wwwlogs_root", "/data/wwwlogs")
+	v.SetDefault("nginx.www_root", "")
+	v.SetDefault("nginx.ssl_root", "")
+	v.SetDefault("nginx.wwwlogs_root", "")
 	v.SetDefault("nginx.source_root", "/usr/local/src/opsvault-nginx")
 	v.SetDefault("nginx.version", "1.31.0")
 	v.SetDefault("nginx.pcre_version", "8.45")
@@ -283,7 +283,7 @@ func resolveFallbackPaths(v *viper.Viper) {
 		} else {
 			rootDir = "/data/opsvault"
 		}
-		v.Set("system.root_dir", rootDir)
+		v.SetDefault("system.root_dir", rootDir)
 	}
 
 	if v.GetString("docker.data_root") == "" {
@@ -299,11 +299,25 @@ func resolveFallbackPaths(v *viper.Viper) {
 	if v.GetString("nginx.ssl_root") == "" {
 		v.Set("nginx.ssl_root", filepath.Join(rootDir, "ssl"))
 	}
+	if v.GetString("nginx.www_root") == "" {
+		if legacy := v.GetString("nginx.data_root"); legacy != "" {
+			v.Set("nginx.www_root", legacy)
+		} else {
+			v.Set("nginx.www_root", filepath.Join(rootDir, "wwwroot"))
+		}
+	}
+	if v.GetString("nginx.wwwlogs_root") == "" {
+		if legacy := v.GetString("nginx.datalogs_root"); legacy != "" {
+			v.Set("nginx.wwwlogs_root", legacy)
+		} else {
+			v.Set("nginx.wwwlogs_root", filepath.Join(rootDir, "wwwlogs"))
+		}
+	}
 	if v.GetString("nginx.data_root") == "" {
-		v.Set("nginx.data_root", filepath.Join(rootDir, "dataroot"))
+		v.Set("nginx.data_root", v.GetString("nginx.www_root"))
 	}
 	if v.GetString("nginx.datalogs_root") == "" {
-		v.Set("nginx.datalogs_root", filepath.Join(rootDir, "datalogs"))
+		v.Set("nginx.datalogs_root", v.GetString("nginx.wwwlogs_root"))
 	}
 
 	backupPath := v.GetString("backup.storage_path")
@@ -391,3 +405,14 @@ func windowsDefaultRootDir() string {
 	}
 	return filepath.Join(".", "opsvault_data")
 }
+
+func resetConfigForTest() {
+	*config = *viper.New()
+	if rootCmd.PersistentFlags().Lookup("mode") != nil {
+		_ = config.BindPFlag("mode", rootCmd.PersistentFlags().Lookup("mode"))
+	}
+	if rootCmd.PersistentFlags().Lookup("bind-ip") != nil {
+		_ = config.BindPFlag("docker.bind_ip", rootCmd.PersistentFlags().Lookup("bind-ip"))
+	}
+}
+

@@ -315,15 +315,30 @@ func (d *NginxDriver) vhostConfPath(domain string) string {
 }
 
 func nginxConfigString(cfg *viper.Viper, key string) string {
+	rootDir := ""
+	if cfg != nil {
+		rootDir = cfg.GetString("system.root_dir")
+	}
+	if rootDir == "" {
+		rootDir = "/data/opsvault"
+	}
 	switch key {
 	case "nginx.install_path":
 		return configString(cfg, key, "/usr/local/nginx")
 	case "nginx.www_root":
-		return configString(cfg, key, "/data/wwwroot")
+		val := configString(cfg, key, "")
+		if val == "" {
+			val = configString(cfg, "nginx.data_root", filepath.Join(rootDir, "wwwroot"))
+		}
+		return val
 	case "nginx.ssl_root":
-		return configString(cfg, key, "/data/ssl")
+		return configString(cfg, key, filepath.Join(rootDir, "ssl"))
 	case "nginx.wwwlogs_root":
-		return configString(cfg, key, "/data/wwwlogs")
+		val := configString(cfg, key, "")
+		if val == "" {
+			val = configString(cfg, "nginx.datalogs_root", filepath.Join(rootDir, "wwwlogs"))
+		}
+		return val
 	case "nginx.vhost_dir":
 		return configString(cfg, key, "")
 	default:

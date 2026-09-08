@@ -16,6 +16,16 @@ type ConfigCategory struct {
 // ConfigCategories defines all configuration groupings.
 var ConfigCategories = []ConfigCategory{
 	{
+		Name: "System Settings",
+		Keys: []string{
+			"system.root_dir",
+			"mode",
+			"log.level",
+			"log.storage_path",
+			"backup.storage_path",
+		},
+	},
+	{
 		Name: "Docker Global",
 		Keys: []string{
 			"docker.name_prefix",
@@ -177,18 +187,11 @@ var ConfigCategories = []ConfigCategory{
 			"k8s.dashboard.port",
 		},
 	},
-	{
-		Name: "System Settings",
-		Keys: []string{
-			"log.level",
-			"log.storage_path",
-			"mode",
-		},
-	},
 }
 
 // ConfigKeys is kept for backward compatibility if needed, but categories are preferred.
 var ConfigKeys = []string{
+	"system.root_dir",
 	"docker.name_prefix",
 	"docker.network_name",
 	"docker.cidr",

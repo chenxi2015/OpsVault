@@ -39,7 +39,10 @@ func (c *commandSet) newUninstallCommand() *cobra.Command {
 			v := c.config
 			dataRoot := v.GetString("docker.data_root")
 			if dataRoot == "" {
-				dataRoot = "/data/opsvault"
+				dataRoot = v.GetString("system.root_dir")
+				if dataRoot == "" {
+					dataRoot = "/data/opsvault"
+				}
 			}
 			namePrefix := v.GetString("docker.name_prefix")
 			if namePrefix == "" {

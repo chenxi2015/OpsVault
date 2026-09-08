@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"OpsVault/internal/driver/ansible"
@@ -55,7 +56,10 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 			}
 
 			if vars.DataRoot == "" {
-				vars.DataRoot = "/data/opsvault"
+				vars.DataRoot = v.GetString("system.root_dir")
+				if vars.DataRoot == "" {
+					vars.DataRoot = "/data/opsvault"
+				}
 			}
 			if vars.NetworkName == "" {
 				vars.NetworkName = "opsvault-net"
@@ -199,14 +203,15 @@ func (c *commandSet) newDeployCommand() *cobra.Command {
 				if vars.NginxSourceRoot == "" {
 					vars.NginxSourceRoot = "/usr/local/src/opsvault-nginx"
 				}
+				rootBase := vars.DataRoot
 				if vars.NginxWWWRoot == "" {
-					vars.NginxWWWRoot = "/data/wwwroot"
+					vars.NginxWWWRoot = filepath.ToSlash(filepath.Join(rootBase, "wwwroot"))
 				}
 				if vars.NginxSSLRoot == "" {
-					vars.NginxSSLRoot = "/data/ssl"
+					vars.NginxSSLRoot = filepath.ToSlash(filepath.Join(rootBase, "ssl"))
 				}
 				if vars.NginxWWWLogsRoot == "" {
-					vars.NginxWWWLogsRoot = "/data/wwwlogs"
+					vars.NginxWWWLogsRoot = filepath.ToSlash(filepath.Join(rootBase, "wwwlogs"))
 				}
 				if vars.NginxRunUser == "" {
 					vars.NginxRunUser = "www"

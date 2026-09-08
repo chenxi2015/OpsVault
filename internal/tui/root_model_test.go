@@ -218,3 +218,64 @@ func TestGitLabConfigKeysAndInput(t *testing.T) {
 	}
 }
 
+func TestConfigCategoriesSystemSettingsFirst(t *testing.T) {
+	if len(ConfigCategories) == 0 {
+		t.Fatal("expected ConfigCategories to have entries")
+	}
+	firstCat := ConfigCategories[0]
+	if firstCat.Name != "System Settings" {
+		t.Errorf("expected first category to be 'System Settings', got %q", firstCat.Name)
+	}
+
+	hasRootDir := false
+	for _, key := range firstCat.Keys {
+		if key == "system.root_dir" {
+			hasRootDir = true
+			break
+		}
+	}
+	if !hasRootDir {
+		t.Errorf("expected 'system.root_dir' in System Settings keys, got %v", firstCat.Keys)
+	}
+}
+
+func TestConfigWizardViewWithDefaultYaml(t *testing.T) {
+	v := viper.New()
+	v.Set("system.root_dir", "/www/opsvault")
+	v.Set("nginx.www_root", "/www/opsvault/wwwroot")
+	v.Set("nginx.ssl_root", "/www/opsvault/ssl")
+	v.Set("nginx.wwwlogs_root", "/www/opsvault/wwwlogs")
+	v.Set("docker.data_root", "/www/opsvault")
+
+	model := NewRootModel(StaticStatusProvider{})
+	model.config = v
+	model.selectedConfigCategory = 0 // System Settings
+
+	viewSys := ConfigWizardView(model)
+	if !strings.Contains(viewSys, "SYSTEM SETTINGS CONFIGURATIONS") {
+		t.Errorf("expected view to contain 'SYSTEM SETTINGS CONFIGURATIONS'")
+	}
+	if !strings.Contains(viewSys, "system.root_dir") || !strings.Contains(viewSys, "/www/opsvault") {
+		t.Errorf("expected view to display system.root_dir and /www/opsvault")
+	}
+
+	// Switch to Nginx category
+	for idx, cat := range ConfigCategories {
+		if cat.Name == "Nginx" {
+			model.selectedConfigCategory = idx
+			break
+		}
+	}
+	viewNginx := ConfigWizardView(model)
+	if !strings.Contains(viewNginx, "/www/opsvault/wwwroot") {
+		t.Errorf("expected nginx.www_root to display /www/opsvault/wwwroot")
+	}
+	if !strings.Contains(viewNginx, "/www/opsvault/wwwlogs") {
+		t.Errorf("expected nginx.wwwlogs_root to display /www/opsvault/wwwlogs")
+	}
+	if !strings.Contains(viewNginx, "/www/opsvault/ssl") {
+		t.Errorf("expected nginx.ssl_root to display /www/opsvault/ssl")
+	}
+}
+
+

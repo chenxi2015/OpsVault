@@ -61,6 +61,14 @@ func newNginxInstaller(cfg *viper.Viper) *nginxInstaller {
 }
 
 func newNginxInstallPlan(cfg *viper.Viper) nginxInstallPlan {
+	rootDir := ""
+	if cfg != nil {
+		rootDir = cfg.GetString("system.root_dir")
+	}
+	if rootDir == "" {
+		rootDir = "/data/opsvault"
+	}
+
 	opensslVer := versionutil.ResolveOpenSSLVersion(configString(cfg, "nginx.openssl_version", "latest"), "3.0.15")
 
 	nginxVer := versionutil.ResolveNginxVersion(
@@ -68,12 +76,22 @@ func newNginxInstallPlan(cfg *viper.Viper) nginxInstallPlan {
 		"1.26.2",
 	)
 
+	wwwRoot := configString(cfg, "nginx.www_root", "")
+	if wwwRoot == "" {
+		wwwRoot = configString(cfg, "nginx.data_root", filepath.Join(rootDir, "wwwroot"))
+	}
+	sslRoot := configString(cfg, "nginx.ssl_root", filepath.Join(rootDir, "ssl"))
+	wwwLogsRoot := configString(cfg, "nginx.wwwlogs_root", "")
+	if wwwLogsRoot == "" {
+		wwwLogsRoot = configString(cfg, "nginx.datalogs_root", filepath.Join(rootDir, "wwwlogs"))
+	}
+
 	return nginxInstallPlan{
 		sourceRoot:      configString(cfg, "nginx.source_root", "/usr/local/src/opsvault-nginx"),
 		installPath:     configString(cfg, "nginx.install_path", "/usr/local/nginx"),
-		wwwRoot:         configString(cfg, "nginx.www_root", "/data/wwwroot"),
-		sslRoot:         configString(cfg, "nginx.ssl_root", "/data/ssl"),
-		wwwLogsRoot:     configString(cfg, "nginx.wwwlogs_root", "/data/wwwlogs"),
+		wwwRoot:         wwwRoot,
+		sslRoot:         sslRoot,
+		wwwLogsRoot:     wwwLogsRoot,
 		runUser:         configString(cfg, "nginx.run_user", "www"),
 		runGroup:        configString(cfg, "nginx.run_group", "www"),
 		version:         nginxVer,
