@@ -8,6 +8,8 @@ error_log %s/error_nginx.log crit;
 pid /var/run/nginx.pid;
 worker_rlimit_nofile 51200;
 
+include modules/*.conf;
+
 events {
   use epoll;
   worker_connections 51200;

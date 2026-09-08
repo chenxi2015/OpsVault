@@ -27,6 +27,7 @@ func NewCommand(cfg *viper.Viper) *cobra.Command {
 		c.newUpgradeCommand(),
 		c.newVHostCommand(),
 		c.newSSLCommand(),
+		c.newModuleCommand(),
 		c.newStatusCommand(),
 		c.newLogCommand(),
 	)

@@ -48,6 +48,12 @@ func Infof(format string, args ...any) {
 	notifyListener(msg)
 }
 
+func Warnf(format string, args ...any) {
+	msg := fmt.Sprintf("[WARN] "+format, args...)
+	log.Output(2, msg)
+	notifyListener(msg)
+}
+
 func Errorf(format string, args ...any) {
 	msg := fmt.Sprintf("[ERROR] "+format, args...)
 	log.Output(2, msg)
