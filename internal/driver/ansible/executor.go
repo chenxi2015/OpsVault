@@ -26,6 +26,9 @@ func NewExecutor(cfg *Config, inventoryPath string) *Executor {
 
 // RunAnsible runs the basic ansible ad-hoc command.
 func (e *Executor) RunAnsible(ctx context.Context, group string, module string, args string, stdout, stderr io.Writer) error {
+	if err := EnsureAnsible(e.Cfg); err != nil {
+		return err
+	}
 	logger.Infof("[ansible] Executing ad-hoc command (group=%s, module=%s)...", group, module)
 	cmdArgs := []string{
 		group,
@@ -52,6 +55,9 @@ func (e *Executor) RunAnsible(ctx context.Context, group string, module string, 
 
 // RunPlaybook runs an ansible-playbook command on the specified target group.
 func (e *Executor) RunPlaybook(ctx context.Context, playbookPath string, group string, extraVars map[string]string, stdout, stderr io.Writer) error {
+	if err := EnsureAnsible(e.Cfg); err != nil {
+		return err
+	}
 	logger.Infof("[ansible] Running playbook %s (group=%s)...", playbookPath, group)
 	cmdArgs := []string{
 		"-i", e.InventoryPath,
