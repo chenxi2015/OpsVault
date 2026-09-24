@@ -23,3 +23,14 @@ func TestGenPasswordAvoidsUnsafeCharacters(t *testing.T) {
 		}
 	}
 }
+
+func TestGenPasswordIsUniqueAcrossCalls(t *testing.T) {
+	seen := map[string]bool{}
+	for i := 0; i < 50; i++ {
+		password := GenPassword(20)
+		if seen[password] {
+			t.Fatalf("generated duplicate password %q", password)
+		}
+		seen[password] = true
+	}
+}

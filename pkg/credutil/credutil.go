@@ -25,7 +25,7 @@ func GenPassword(length int) string {
 	safeSymbols := "!-_+.?"
 
 	chars := make([]byte, length)
-	for i := 0; i < length; i++ {
+	for i := range chars {
 		chars[i] = safePasswordCharset[randomIndex(len(safePasswordCharset))]
 	}
 
@@ -33,12 +33,6 @@ func GenPassword(length int) string {
 	chars[1] = upperLetters[randomIndex(len(upperLetters))]
 	chars[2] = digits[randomIndex(len(digits))]
 	chars[3] = safeSymbols[randomIndex(len(safeSymbols))]
-
-	for i := range chars {
-		if chars[i] == 0 {
-			chars[i] = safePasswordCharset[randomIndex(len(safePasswordCharset))]
-		}
-	}
 
 	return string(chars)
 }
