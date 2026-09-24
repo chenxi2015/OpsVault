@@ -1,42 +1,57 @@
 package credutil
 
 import (
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/sethvargo/go-password/password"
 )
 
-var defaultGenerator *password.Generator
+const safePasswordCharset = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!-_+.?"
 
-func init() {
-	var err error
-	defaultGenerator, err = password.NewGenerator(&password.GeneratorInput{
-		Digits:       "23456789",                // Exclude ambiguous 0, 1
-		Symbols:      "!@$%^&*",                 // Exclude #, ", ', \, space to avoid config parsing issues
-		LowerLetters: "abcdefghjkmnpqrstuvwxyz", // Exclude ambiguous l, o
-		UpperLetters: "ABCDEFGHJKMNPQRSTUVWXYZ", // Exclude ambiguous I, O
-	})
-	if err != nil {
-		defaultGenerator = nil
-	}
-}
-
-// GenPassword generates a cryptographically random password of the given length.
-// The result always contains at least one character from each character class.
+// GenPassword generates a cryptographically random password with a balanced charset.
+// It keeps a few common safe punctuation marks to improve entropy while avoiding config-breaking
+// characters such as @, $, #, &, *, \, /, :, ;, quotes, backticks, and spaces.
 func GenPassword(length int) string {
-	if length < 8 {
-		length = 8
+	if length < 12 {
+		length = 12
 	}
-	if defaultGenerator != nil {
-		pwd, err := defaultGenerator.Generate(length, length/4, length/4, false, false)
-		if err == nil {
-			return pwd
+
+	lowerLetters := "abcdefghjkmnpqrstuvwxyz"
+	upperLetters := "ABCDEFGHJKMNPQRSTUVWXYZ"
+	digits := "23456789"
+	safeSymbols := "!-_+.?"
+
+	chars := make([]byte, length)
+	for i := 0; i < length; i++ {
+		chars[i] = safePasswordCharset[randomIndex(len(safePasswordCharset))]
+	}
+
+	chars[0] = lowerLetters[randomIndex(len(lowerLetters))]
+	chars[1] = upperLetters[randomIndex(len(upperLetters))]
+	chars[2] = digits[randomIndex(len(digits))]
+	chars[3] = safeSymbols[randomIndex(len(safeSymbols))]
+
+	for i := range chars {
+		if chars[i] == 0 {
+			chars[i] = safePasswordCharset[randomIndex(len(safePasswordCharset))]
 		}
 	}
-	pwd, _ := password.Generate(length, length/4, length/4, false, false)
-	return pwd
+
+	return string(chars)
+}
+
+func randomIndex(max int) int {
+	if max <= 0 {
+		return 0
+	}
+	idx, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
+	if err != nil {
+		return 0
+	}
+	return int(idx.Int64())
 }
 
 // Credential holds a single key-value pair for display.
