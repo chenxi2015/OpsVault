@@ -19,31 +19,37 @@ OpsVault 是一个面向 CentOS 7 / CentOS Stream 的运维工具箱，提供：
 ## 当前已完成
 
 - 完整命令树：
-  - `opsvault tui`
+  - `opsvault tui` (全功能终端交互控制台)
   - `opsvault init` (一键初始化与服务选择安装)
   - `opsvault doctor` (系统与运行环境体检诊断)
   - `opsvault nginx ...` (Nginx 二进制编译与 vhost/SSL 管理)
-  - `opsvault mysql ...`
-  - `opsvault redis ...`
-  - `opsvault rocketmq ...`
-  - `opsvault rabbitmq ...`
-  - `opsvault postgres ...`
+  - `opsvault mysql ...` (MySQL 关系型数据库)
+  - `opsvault redis ...` (Redis 内存缓存与持久化)
+  - `opsvault postgres ...` (PostgreSQL 关系型数据库)
+  - `opsvault milvus ...` (Milvus 向量数据库，支持单机 Standalone)
+  - `opsvault qdrant ...` (Qdrant 向量数据库，支持 API Key 认证)
+  - `opsvault ollama ...` (Ollama 本地大模型/Embedding 推理引擎)
+  - `opsvault kafka ...` (Kafka 消息队列，KRaft 模式)
+  - `opsvault rocketmq ...` (RocketMQ 消息队列，一体化 Broker+NameServer)
+  - `opsvault rabbitmq ...` (RabbitMQ 消息队列，含 Management 界面)
   - `opsvault minio ...` (MinIO 对象存储管理，内置 Console)
   - `opsvault prometheus ...` (Prometheus 监控服务)
   - `opsvault grafana ...` (Grafana 监控看板)
   - `opsvault node-exporter ...` (Node Exporter 系统指标采集)
   - `opsvault nacos ...` (Nacos 注册与配置中心)
-  - `opsvault elk ...` (ELK 堆栈)
-  - `opsvault gitlab ...` (GitLab 代码托管)
-  - `opsvault jenkins ...` (Jenkins CI/CD)
+  - `opsvault elk ...` (ELK 日志堆栈)
+  - `opsvault gitlab ...` (GitLab 代码托管平台)
+  - `opsvault jenkins ...` (Jenkins CI/CD 自动化流水线)
+  - `opsvault k8s ...` (K3s 轻量级 Kubernetes 集群与 Kuboard 控制台)
   - `opsvault bak ...` (配置备份与恢复)
+  - `opsvault migrate ...` (服务跨主机迁移与引擎转换)
   - `opsvault ansible ...` (多机批量连接、巡检、自动化部署、二进制分发与服务回收)
 - 全局配置加载与默认配置模板
 - `driver.ServiceDriver` 统一接口与 `ServiceStatus` 状态结构
-- Docker 网络/基础驱动封装
+- Docker 网络/基础驱动封装（专属 `opsvault-net` 网桥）
 - Nginx 源码下载、编译安装、systemd 与基础配置生成
-- 基础 TUI 页面骨架
-- 核心单元测试与可编译构建
+- 丰富交互的 BubbleTea TUI 页面
+- 自动化单测与全平台 Makefile 交叉编译构建支持
 
 ## 配置文件
 
@@ -98,6 +104,112 @@ opsvault --config /path/to/config.yaml mysql status
 
 > [!NOTE]
 > **安全最佳实践**：无需也不建议将用户登录密码硬编码在 `default.yaml` 配置文件中或写入 `audit.log` 审计日志中。初始密码存在系统临时凭据文件中，修改后的密码由 GitLab 内部数据库加密存储，忘记密码可随时通过上述命令重置。
+
+
+## AI 与向量数据库服务
+
+OpsVault 原生集成了目前主流的开源向量数据库与大模型本地推理引擎，支持单机快速拉起与全生命周期运维：
+
+### 1. Milvus 向量数据库 (Docker Standalone)
+
+采用官方单机嵌入式模式（内置嵌入式 etcd 与本地文件系统持久化存储），开箱即用：
+
+```bash
+# 安装并拉起 Milvus 单机实例
+opsvault milvus install
+
+# 启停与状态检查
+opsvault milvus start
+opsvault milvus stop
+opsvault milvus restart
+opsvault milvus status
+
+# 查看日志与版本升级
+opsvault milvus log
+opsvault milvus upgrade --tag v2.4.15
+
+# 卸载服务（可选 --purge 彻底删除宿主机挂载数据）
+opsvault milvus uninstall [--purge]
+```
+
+- **默认端口**：`19530` (gRPC / RESTful API)、`9091` (Metrics / Healthz)
+- **挂载目录**：`/data/opsvault/milvus/data` 挂载至容器 `/var/lib/milvus`
+
+### 2. Qdrant 向量数据库 (Docker)
+
+轻量高效的 Rust 向量数据库，内置可视化 Web 控制台：
+
+```bash
+# 安装 Qdrant（支持通过 --api-key 启用安全访问控制）
+opsvault qdrant install [--api-key your_secret_key]
+
+# 生命周期管理
+opsvault qdrant start
+opsvault qdrant stop
+opsvault qdrant restart
+opsvault qdrant status
+opsvault qdrant log
+opsvault qdrant upgrade --tag v1.13.0
+opsvault qdrant uninstall [--purge]
+```
+
+- **默认端口**：`6333` (REST API / Web Dashboard)、`6334` (gRPC)
+- **挂载目录**：`/data/opsvault/qdrant/storage`
+
+### 3. Ollama 本地推理引擎 (Docker)
+
+本地大模型与向量 Embedding 模型推理工具，提供兼容 OpenAI 的 API 接口：
+
+```bash
+opsvault ollama install
+opsvault ollama start
+opsvault ollama stop
+opsvault ollama status
+opsvault ollama log
+opsvault ollama upgrade --tag latest
+opsvault ollama uninstall [--purge]
+```
+
+- **默认端口**：`11434` (HTTP API / OpenAI Compatible Base URL `/v1`)
+- **挂载目录**：`/data/opsvault/ollama/models`
+
+
+## Kubernetes 集群与控制台 (k8s)
+
+基于轻量级 K3s 实现的一键单机/边缘 Kubernetes 发行版管理：
+
+```bash
+# 一键安装轻量 Kubernetes 集群
+opsvault k8s install
+
+# 部署并访问 Web 可视化管理面板 (如 Kuboard)
+opsvault k8s dashboard
+
+# 查看集群运行状态与核心资源
+opsvault k8s status
+opsvault k8s get nodes
+opsvault k8s get pods
+
+# 集群健康诊断与卸载
+opsvault k8s doctor
+opsvault k8s uninstall [--purge]
+```
+
+
+## 服务资产迁移 (migrate)
+
+支持跨主机群组的数据同步迁移与运行引擎格式转换：
+
+```bash
+# 跨主机迁移：将 mysql 服务配置与数据从 test 主机组同步至 prod 主机组
+opsvault migrate host --service mysql --source test_servers --target prod_servers --sync-data
+
+# 引擎转换：将单机 Docker 模式运行的服务转换并迁移至 Kubernetes
+opsvault migrate engine --service redis --from docker --to k8s
+
+# 查看当前迁移任务状态与进度
+opsvault migrate status
+```
 
 
 ## 配置备份与恢复 (bak)
@@ -165,17 +277,36 @@ opsvault nginx ssl apply --domain api.example.com
 
 ## 构建与测试
 
+项目提供标准 `Makefile` 支持本地编译与跨平台交叉打包构建：
+
 ```bash
+# 1. 运行单元测试
 go test ./...
-go build ./...
+
+# 2. 本地快速构建
+make build                  # 编译当前平台可执行文件至 bin/opsvault
+
+# 3. 跨平台交叉编译 (输出至 bin/)
+make build-linux            # 编译 Linux (amd64) 二进制 (生产服务器目标)
+make build-darwin-arm64     # 编译 macOS (Apple Silicon M系列)
+make build-darwin-amd64     # 编译 macOS (Intel)
+make build-windows          # 编译 Windows (amd64)
+make build-all              # 一键编译所有主流平台二进制
+
+# 4. 代码质量与格式化
+make fmt                    # go fmt 格式化源码
+make vet                    # go vet 静态代码检查
+make clean                  # 清理 bin/ 目录
 ```
 
 ## 核心架构设计亮点
 
-- **统一驱动接口 (`driver.ServiceDriver`)**：严格定义标准组件生命周期（Install / Start / Stop / Restart / Uninstall / Upgrade / Status）通用接口，命令层与驱动层解耦。
-- **CLI 工厂模式 (`cmd/common/factory.go`)**：全量 12 个中间件通过通用的命令工厂挂载 `start / stop / restart / status / log / uninstall` 子命令，极大降低了模版代码冗余与维护成本。
-- **Docker 专属网桥与持久化**：所有 Docker 驱动中间件统一接入专属网桥 `opsvault-net` (`172.28.0.0/16`)，宿主机持久化目录统一规范存放在 `/data/opsvault/`。
-- **Nginx Binary 驱动内建编排**：由 OpsVault Go 源码内建编排下载 Nginx/PCRE/OpenSSL 源码并编译，自动注册 Systemd 服务与 Logrotate。
+- **统一驱动抽象 (`driver.ServiceDriver`)**：严格定义标准组件生命周期（Install / Start / Stop / Restart / Uninstall / Upgrade / Status）通用接口，CLI、TUI 命令层与底层 Docker/二进制/K8s 驱动完全解耦。
+- **CLI 工厂模式规约 (`cmd/common/factory.go`)**：全量 18+ 个中间件统一通过工厂函数自动组装生命周期子命令，零样板代码冗余，扩展新服务仅需数行代码。
+- **Docker 专属网桥与规范持久化**：所有容器驱动组件统一接入专属网桥 `opsvault-net` (`172.28.0.0/16`) 实现容器内网互通，宿主机数据持久化目录统一规范于 `/data/opsvault/{service}`，支持 `--purge` 级联清理。
+- **原生 AI & 向量数据库生态支持**：开箱即用集成 Milvus (单机嵌入式)、Qdrant 与 Ollama，全自动化健康探针与客户端访问凭据卡片输出。
+- **Nginx Binary 驱动内建编排**：由 OpsVault Go 源码内建编排下载 Nginx/PCRE/OpenSSL 源码并编译优化，自动注册 Systemd 服务与 Logrotate。
+- **中心与边缘协同架构**：结合 `ansible push` 边缘推流与批量编排，中心端一键批量批量巡检与部署，目标节点即可直接独立运行 `opsvault tui` 就地排查。
 
 ## 说明
 

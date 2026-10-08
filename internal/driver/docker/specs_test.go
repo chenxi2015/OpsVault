@@ -602,4 +602,29 @@ func TestOllamaContainerSpec(t *testing.T) {
 	}
 }
 
+func TestMilvusContainerSpec(t *testing.T) {
+	drv := NewMilvusDriver(WrapClient(nil), testConfigWithRoot("/data/opsvault"))
+	cfg, host, err := drv.containerSpec()
+	if err != nil {
+		t.Fatalf("containerSpec: %v", err)
+	}
+	if cfg.Image != "milvusdb/milvus:v2.4.15" {
+		t.Fatalf("image = %q", cfg.Image)
+	}
+	if host.PortBindings[nat.Port("19530/tcp")][0].HostPort != "19530" {
+		t.Fatalf("port binding = %#v", host.PortBindings[nat.Port("19530/tcp")])
+	}
+	if host.PortBindings[nat.Port("9091/tcp")][0].HostPort != "9091" {
+		t.Fatalf("port binding = %#v", host.PortBindings[nat.Port("9091/tcp")])
+	}
+	if len(cfg.Cmd) != 3 || cfg.Cmd[0] != "milvus" || cfg.Cmd[1] != "run" || cfg.Cmd[2] != "standalone" {
+		t.Fatalf("cmd = %#v", cfg.Cmd)
+	}
+	creds := drv.GetCredentials()
+	if len(creds) != 2 {
+		t.Fatalf("creds len = %d, expected 2", len(creds))
+	}
+}
+
+
 

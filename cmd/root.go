@@ -15,6 +15,7 @@ import (
 	"OpsVault/cmd/jenkins"
 	kafkacmd "OpsVault/cmd/kafka"
 	k8scmd "OpsVault/cmd/k8s"
+	"OpsVault/cmd/milvus"
 	"OpsVault/cmd/minio"
 	"OpsVault/cmd/mysql"
 	"OpsVault/cmd/nacos"
@@ -124,6 +125,7 @@ func init() {
 	rootCmd.AddCommand(ansiblecmd.NewCommand(config))
 	rootCmd.AddCommand(k8scmd.NewCommand(config))
 	rootCmd.AddCommand(qdrant.NewCommand(config, dockerFactory))
+	rootCmd.AddCommand(milvus.NewCommand(config, dockerFactory))
 	rootCmd.AddCommand(ollama.NewCommand(config, dockerFactory))
 }
 
@@ -264,6 +266,18 @@ func applyDefaultConfig(v *viper.Viper) {
 
 	v.SetDefault("node_exporter.image", "prom/node-exporter:latest")
 	v.SetDefault("node_exporter.port", 9100)
+
+	v.SetDefault("qdrant.image", "qdrant/qdrant:v1.13.0")
+	v.SetDefault("qdrant.port", 6333)
+	v.SetDefault("qdrant.grpc_port", 6334)
+	v.SetDefault("qdrant.api_key", "")
+
+	v.SetDefault("milvus.image", "milvusdb/milvus:v2.4.15")
+	v.SetDefault("milvus.port", 19530)
+	v.SetDefault("milvus.metrics_port", 9091)
+
+	v.SetDefault("ollama.image", "ollama/ollama:latest")
+	v.SetDefault("ollama.port", 11434)
 
 	v.SetDefault("log.level", "info")
 

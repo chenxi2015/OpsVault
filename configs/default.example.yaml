@@ -135,6 +135,10 @@ qdrant:
   port: 6333                                      # 映射到宿主机的 Qdrant HTTP/REST API 端口
   grpc_port: 6334                                 # 映射到宿主机的 Qdrant gRPC 端口
   api_key: ""                                     # Qdrant 认证密钥（留空则不开启密码校验）
+milvus:
+  image: "milvusdb/milvus:v2.4.15"                # Milvus 向量数据库 Docker 镜像标签 (Standalone 模式)
+  port: 19530                                     # 映射到宿主机的 Milvus gRPC/REST API 端口
+  metrics_port: 9091                              # 映射到宿主机的 Milvus Metrics 监控与健康检查端口
 ollama:
   image: "ollama/ollama:latest"                   # Ollama 大模型/Embedding 推理引擎 Docker 镜像标签
   port: 11434                                     # 映射到宿主机的 Ollama API 端口
