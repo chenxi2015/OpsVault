@@ -40,6 +40,12 @@ mysql:
 nginx:
   install_path: /usr/local/nginx  # Nginx 安装目录（仅 binary 模式生效）
   logrotate_path: /etc/logrotate.d/nginx  # Nginx 日志轮转配置文件路径
+  log_rotate:
+    strategy: daily  # 日志切分策略: daily(基于天), size(基于大小), both(基于天且限制单文件最大大小)
+    size: 100M       # 触发日志切分的文件大小阈值（当 strategy 为 size 或 both 时生效，如 50M, 100M, 500M）
+    rotate: 30       # 保留的历史归档日志文件数量
+    compress: true   # 是否开启历史日志 gzip 压缩
+    dateext: true    # 是否使用日期/时间戳后缀命名归档文件
   openssl_version: latest   # 编译 Nginx 时使用的 OpenSSL 版本，latest=安装时自动获取最新稳定版
   pcre_version: "8.45"  # 编译 Nginx 时使用的 PCRE 版本
   run_group: data  # Nginx 运行时的用户组

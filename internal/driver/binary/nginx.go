@@ -1,8 +1,10 @@
 package binary
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -102,7 +104,7 @@ func (d *NginxDriver) Uninstall(purgeData bool) error {
 			}
 		}
 	}
-	for _, path := range []string{plan.installPath, plan.systemdUnitPath, plan.logrotatePath} {
+	for _, path := range []string{plan.installPath, plan.systemdUnitPath, plan.logrotatePath, "/etc/cron.hourly/opsvault-nginx-logrotate"} {
 		if err := fileutil.RemoveIfExists(path); err != nil {
 			return err
 		}
@@ -372,6 +374,136 @@ func (d *NginxDriver) TailLogs(lines int) (string, error) {
 	journal := exec.Command("journalctl", "-u", "nginx", "-n", strconv.Itoa(lines), "--no-pager")
 	out, err := journal.CombinedOutput()
 	return string(out), err
+}
+
+// NginxLogOptions configures options for viewing Nginx logs.
+type NginxLogOptions struct {
+	Type   string // "access", "error", or "systemd"
+	Domain string // if set, tail virtual host specific log
+	Lines  int    // number of lines to tail
+	Follow bool   // whether to follow log streaming
+}
+
+// resolveLogFile locates the requested Nginx log file path based on type and domain.
+func (d *NginxDriver) resolveLogFile(logType, domain string) string {
+	var candidates []string
+
+	wwwLogs := nginxConfigString(d.Config, "nginx.wwwlogs_root")
+	if wwwLogs == "" {
+		rootDir := nginxConfigString(d.Config, "system.root_dir")
+		if rootDir == "" {
+			rootDir = "/data/opsvault"
+		}
+		wwwLogs = filepath.Join(rootDir, "wwwlogs")
+	}
+
+	installPath := nginxConfigString(d.Config, "nginx.install_path")
+	if installPath == "" {
+		installPath = "/usr/local/nginx"
+	}
+	installLogs := filepath.Join(installPath, "logs")
+
+	if domain != "" {
+		candidates = append(candidates,
+			filepath.Join(wwwLogs, fmt.Sprintf("%s_%s.log", domain, logType)),
+			filepath.Join(installLogs, fmt.Sprintf("%s_%s.log", domain, logType)),
+		)
+	} else {
+		// Check both install logs directory (/usr/local/nginx/logs/access.log)
+		// and opsvault wwwlogs directory (/data/opsvault/wwwlogs/)
+		candidates = append(candidates,
+			filepath.Join(installLogs, fmt.Sprintf("%s.log", logType)),
+			filepath.Join(installLogs, fmt.Sprintf("%s_nginx.log", logType)),
+			filepath.Join(wwwLogs, fmt.Sprintf("%s.log", logType)),
+			filepath.Join(wwwLogs, fmt.Sprintf("%s_nginx.log", logType)),
+		)
+	}
+
+	for _, p := range candidates {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return candidates[0]
+}
+
+// TailServiceLogs streams or outputs access, error, or systemd logs for Nginx.
+func (d *NginxDriver) TailServiceLogs(opts NginxLogOptions, out io.Writer) error {
+	if opts.Lines <= 0 {
+		opts.Lines = 100
+	}
+	logType := strings.ToLower(strings.TrimSpace(opts.Type))
+	if logType == "" {
+		logType = "access"
+	}
+
+	if logType == "systemd" {
+		args := []string{"-u", "nginx", "-n", strconv.Itoa(opts.Lines), "--no-pager"}
+		if opts.Follow {
+			args = append(args, "-f")
+		}
+		cmd := exec.Command("journalctl", args...)
+		cmd.Stdout = out
+		cmd.Stderr = out
+		return cmd.Run()
+	}
+
+	targetFile := d.resolveLogFile(logType, opts.Domain)
+	if _, err := os.Stat(targetFile); err != nil {
+		return fmt.Errorf("nginx %s log file not found at %s", logType, targetFile)
+	}
+
+	if _, err := exec.LookPath("tail"); err == nil {
+		args := []string{"-n", strconv.Itoa(opts.Lines)}
+		if opts.Follow {
+			args = append(args, "-f")
+		}
+		args = append(args, targetFile)
+		cmd := exec.Command("tail", args...)
+		cmd.Stdout = out
+		cmd.Stderr = out
+		return cmd.Run()
+	}
+
+	return tailFileFallback(targetFile, opts.Lines, out)
+}
+
+// RotateLogs triggers logrotate manually on the Nginx logrotate configuration.
+func (d *NginxDriver) RotateLogs() error {
+	plan := newNginxInstallPlan(d.Config)
+	cmd := exec.Command("logrotate", "-f", plan.logrotatePath)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("logrotate failed (%v): %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// tailFileFallback reads the last N lines from a file without requiring the tail executable.
+func tailFileFallback(path string, lines int, out io.Writer) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	var lineList []string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		lineList = append(lineList, scanner.Text())
+		if len(lineList) > lines {
+			lineList = lineList[1:]
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	for _, l := range lineList {
+		if _, err := fmt.Fprintln(out, l); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (d *NginxDriver) ApplySSL(domain string) error {

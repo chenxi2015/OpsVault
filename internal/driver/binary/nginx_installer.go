@@ -18,6 +18,7 @@ import (
 	"OpsVault/pkg/fileutil"
 	"OpsVault/pkg/logger"
 	"OpsVault/pkg/nginxconf"
+	"OpsVault/pkg/sysutil"
 	"OpsVault/pkg/versionutil"
 
 	"github.com/spf13/viper"
@@ -34,10 +35,15 @@ type nginxInstallPlan struct {
 	version         string
 	pcreVersion     string
 	opensslVersion  string
-	modulesOptions  []string
-	systemdUnitPath string
-	logrotatePath   string
-	jobs            int
+	modulesOptions    []string
+	systemdUnitPath   string
+	logrotatePath     string
+	logRotateStrategy string
+	logRotateSize     string
+	logRotateRotate   int
+	logRotateCompress bool
+	logRotateDateExt  bool
+	jobs              int
 	noStart         bool
 	force           bool
 	config          *viper.Viper
@@ -88,24 +94,42 @@ func newNginxInstallPlan(cfg *viper.Viper) nginxInstallPlan {
 		wwwLogsRoot = configString(cfg, "nginx.datalogs_root", filepath.Join(rootDir, "wwwlogs"))
 	}
 
+	logRotateRotate := 30
+	if cfg != nil && cfg.IsSet("nginx.log_rotate.rotate") {
+		logRotateRotate = cfg.GetInt("nginx.log_rotate.rotate")
+	}
+	logRotateCompress := true
+	if cfg != nil && cfg.IsSet("nginx.log_rotate.compress") {
+		logRotateCompress = cfg.GetBool("nginx.log_rotate.compress")
+	}
+	logRotateDateExt := true
+	if cfg != nil && cfg.IsSet("nginx.log_rotate.dateext") {
+		logRotateDateExt = cfg.GetBool("nginx.log_rotate.dateext")
+	}
+
 	return nginxInstallPlan{
-		sourceRoot:      configString(cfg, "nginx.source_root", "/usr/local/src/opsvault-nginx"),
-		installPath:     configString(cfg, "nginx.install_path", "/usr/local/nginx"),
-		wwwRoot:         wwwRoot,
-		sslRoot:         sslRoot,
-		wwwLogsRoot:     wwwLogsRoot,
-		runUser:         configString(cfg, "nginx.run_user", "www"),
-		runGroup:        configString(cfg, "nginx.run_group", "www"),
-		version:         nginxVer,
-		pcreVersion:     configString(cfg, "nginx.pcre_version", "8.45"),
-		opensslVersion:  opensslVer,
-		modulesOptions:  cfg.GetStringSlice("nginx.modules_options"),
-		systemdUnitPath: configString(cfg, "nginx.systemd_unit_path", "/lib/systemd/system/nginx.service"),
-		logrotatePath:   configString(cfg, "nginx.logrotate_path", "/etc/logrotate.d/nginx"),
-		jobs:            configInt(cfg, "nginx.make_jobs", runtime.NumCPU()),
-		noStart:         cfg != nil && cfg.GetBool("nginx.no_start"),
-		force:           cfg != nil && cfg.GetBool("nginx.force"),
-		config:          cfg,
+		sourceRoot:        configString(cfg, "nginx.source_root", "/usr/local/src/opsvault-nginx"),
+		installPath:       configString(cfg, "nginx.install_path", "/usr/local/nginx"),
+		wwwRoot:           wwwRoot,
+		sslRoot:           sslRoot,
+		wwwLogsRoot:       wwwLogsRoot,
+		runUser:           configString(cfg, "nginx.run_user", "www"),
+		runGroup:          configString(cfg, "nginx.run_group", "www"),
+		version:           nginxVer,
+		pcreVersion:       configString(cfg, "nginx.pcre_version", "8.45"),
+		opensslVersion:    opensslVer,
+		modulesOptions:    cfg.GetStringSlice("nginx.modules_options"),
+		systemdUnitPath:   configString(cfg, "nginx.systemd_unit_path", "/lib/systemd/system/nginx.service"),
+		logrotatePath:     configString(cfg, "nginx.logrotate_path", "/etc/logrotate.d/nginx"),
+		logRotateStrategy: configString(cfg, "nginx.log_rotate.strategy", "daily"),
+		logRotateSize:     configString(cfg, "nginx.log_rotate.size", "100M"),
+		logRotateRotate:   logRotateRotate,
+		logRotateCompress: logRotateCompress,
+		logRotateDateExt:  logRotateDateExt,
+		jobs:              configInt(cfg, "nginx.make_jobs", runtime.NumCPU()),
+		noStart:           cfg != nil && cfg.GetBool("nginx.no_start"),
+		force:             cfg != nil && cfg.GetBool("nginx.force"),
+		config:            cfg,
 	}
 }
 
@@ -562,6 +586,18 @@ func (i *nginxInstaller) writeRuntimeFiles() error {
 			return err
 		}
 	}
+
+	// On Linux, if hourly cron directory exists, configure a lightweight hourly cron check
+	// so size-based rotation triggers promptly without waiting for cron.daily.
+	if sysutil.IsLinux() {
+		cronHourlyDir := "/etc/cron.hourly"
+		if fi, err := os.Stat(cronHourlyDir); err == nil && fi.IsDir() {
+			cronHourlyPath := filepath.Join(cronHourlyDir, "opsvault-nginx-logrotate")
+			cronContent := "#!/bin/sh\n/usr/sbin/logrotate " + i.plan.logrotatePath + " >/dev/null 2>&1\n"
+			_ = os.WriteFile(cronHourlyPath, []byte(cronContent), 0o755)
+		}
+	}
+
 	return nil
 }
 
@@ -657,14 +693,19 @@ func downloadFile(target string, sourceURLs ...string) error {
 // by pkg/nginxconf renderers.
 func (p nginxInstallPlan) toNginxConf() nginxconf.Config {
 	return nginxconf.Config{
-		InstallPath:     p.installPath,
-		WWWRoot:         p.wwwRoot,
-		SSLRoot:         p.sslRoot,
-		WWWLogsRoot:     p.wwwLogsRoot,
-		RunUser:         p.runUser,
-		RunGroup:        p.runGroup,
-		SystemdUnitPath: p.systemdUnitPath,
-		LogrotatePath:   p.logrotatePath,
+		InstallPath:       p.installPath,
+		WWWRoot:           p.wwwRoot,
+		SSLRoot:           p.sslRoot,
+		WWWLogsRoot:       p.wwwLogsRoot,
+		RunUser:           p.runUser,
+		RunGroup:          p.runGroup,
+		SystemdUnitPath:   p.systemdUnitPath,
+		LogrotatePath:     p.logrotatePath,
+		LogRotateStrategy: p.logRotateStrategy,
+		LogRotateSize:     p.logRotateSize,
+		LogRotateRotate:   p.logRotateRotate,
+		LogRotateCompress: &p.logRotateCompress,
+		LogRotateDateExt:  &p.logRotateDateExt,
 	}
 }
 

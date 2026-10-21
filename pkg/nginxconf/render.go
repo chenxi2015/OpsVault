@@ -5,6 +5,7 @@ package nginxconf
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 )
 
@@ -12,14 +13,19 @@ import (
 // Both the binary driver (local install) and the Ansible playbook generator
 // populate this struct from Viper config, ensuring a single source of truth.
 type Config struct {
-	InstallPath     string
-	WWWRoot         string
-	SSLRoot         string
-	WWWLogsRoot     string
-	RunUser         string
-	RunGroup        string
-	SystemdUnitPath string
-	LogrotatePath   string
+	InstallPath       string
+	WWWRoot           string
+	SSLRoot           string
+	WWWLogsRoot       string
+	RunUser           string
+	RunGroup          string
+	SystemdUnitPath   string
+	LogrotatePath     string
+	LogRotateStrategy string // "daily", "size", "both"
+	LogRotateSize     string // e.g. "100M"
+	LogRotateRotate   int    // retention count (default: 30)
+	LogRotateCompress *bool  // gzip compress old logs (nil defaults to true)
+	LogRotateDateExt  *bool  // date extension in archive names (nil defaults to true)
 }
 
 // RenderBaseConfig returns the content for nginx.conf (main config file).
@@ -40,8 +46,117 @@ func RenderSystemdUnit(c Config) string {
 }
 
 // RenderLogrotate returns the content for /etc/logrotate.d/nginx.
+// It supports rotation based on time (daily/weekly/monthly), size, or both (daily + maxsize).
+// It automatically covers both Nginx install logs (/usr/local/nginx/logs/*.log)
+// and OpsVault website logs (wwwlogs/*.log) to ensure access.log and error.log are properly rotated.
 func RenderLogrotate(c Config) string {
-	return fmt.Sprintf(logrotateTemplate, c.WWWLogsRoot)
+	installPath := filepath.ToSlash(strings.TrimRight(c.InstallPath, "/\\"))
+	if installPath == "" {
+		installPath = "/usr/local/nginx"
+	}
+
+	var logGlobs []string
+	seen := make(map[string]bool)
+
+	addGlob := func(dir string) {
+		dir = filepath.ToSlash(strings.TrimRight(dir, "/\\"))
+		if dir == "" || seen[dir] {
+			return
+		}
+		seen[dir] = true
+		logGlobs = append(logGlobs, dir+"/*.log")
+	}
+
+	// Always cover Nginx install logs directory (where access.log and error.log are located by default)
+	addGlob(filepath.Join(installPath, "logs"))
+
+	// Also cover wwwlogs directory if configured
+	if c.WWWLogsRoot != "" {
+		addGlob(c.WWWLogsRoot)
+	}
+
+	strategy := strings.ToLower(strings.TrimSpace(c.LogRotateStrategy))
+	if strategy == "" {
+		strategy = "daily"
+	}
+
+	size := strings.TrimSpace(c.LogRotateSize)
+	if size == "" {
+		size = "100M"
+	}
+
+	rotate := c.LogRotateRotate
+	if rotate <= 0 {
+		rotate = 30
+	}
+
+	user := strings.TrimSpace(c.RunUser)
+	if user == "" {
+		user = "www"
+	}
+	group := strings.TrimSpace(c.RunGroup)
+	if group == "" {
+		group = user
+	}
+
+	compress := true
+	if c.LogRotateCompress != nil {
+		compress = *c.LogRotateCompress
+	}
+
+	dateext := true
+	if c.LogRotateDateExt != nil {
+		dateext = *c.LogRotateDateExt
+	}
+
+	var strategyDirective string
+	switch strategy {
+	case "size":
+		strategyDirective = fmt.Sprintf("    size %s", size)
+	case "both":
+		strategyDirective = fmt.Sprintf("    daily\n    maxsize %s", size)
+	case "weekly":
+		strategyDirective = "    weekly"
+	case "monthly":
+		strategyDirective = "    monthly"
+	default:
+		strategyDirective = "    daily"
+	}
+
+	var dateextDirective string
+	if dateext {
+		if strategy == "size" || strategy == "both" {
+			dateextDirective = "    dateext\n    dateformat -%Y%m%d_%s"
+		} else {
+			dateextDirective = "    dateext\n    dateformat -%Y%m%d"
+		}
+	}
+
+	var compressDirective string
+	if compress {
+		compressDirective = "    compress\n    delaycompress"
+	}
+
+	var lines []string
+	lines = append(lines, fmt.Sprintf("%s {", strings.Join(logGlobs, " ")))
+	lines = append(lines, strategyDirective)
+	lines = append(lines, fmt.Sprintf("    rotate %d", rotate))
+	lines = append(lines, "    missingok")
+	if dateextDirective != "" {
+		lines = append(lines, dateextDirective)
+	}
+	if compressDirective != "" {
+		lines = append(lines, compressDirective)
+	}
+	lines = append(lines, "    notifempty")
+	lines = append(lines, fmt.Sprintf("    create 0640 %s %s", user, group))
+	lines = append(lines, "    sharedscripts")
+	lines = append(lines, "    postrotate")
+	lines = append(lines, fmt.Sprintf("        [ -f /var/run/nginx.pid ] && kill -USR1 $(cat /var/run/nginx.pid) 2>/dev/null || [ -f %s/logs/nginx.pid ] && kill -USR1 $(cat %s/logs/nginx.pid) 2>/dev/null || true", installPath, installPath))
+	lines = append(lines, "    endscript")
+	lines = append(lines, "}\n")
+
+	return strings.Join(lines, "\n")
 }
 
 // FormatProxyPass standardizes the proxy pass address (e.g. "8080" -> "http://127.0.0.1:8080").

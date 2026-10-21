@@ -456,5 +456,71 @@ func TestIsTarGzValid(t *testing.T) {
 	}
 }
 
+func TestNginxLogRotateConfigInPlan(t *testing.T) {
+	cfg := testNginxConfig(t)
+	cfg.Set("nginx.version", "1.31.0")
+	cfg.Set("nginx.openssl_version", "1.1.1w")
+	cfg.Set("nginx.log_rotate.strategy", "both")
+	cfg.Set("nginx.log_rotate.size", "50M")
+	cfg.Set("nginx.log_rotate.rotate", 15)
+	cfg.Set("nginx.log_rotate.compress", false)
+	cfg.Set("nginx.log_rotate.dateext", true)
+
+	plan := newNginxInstallPlan(cfg)
+	if plan.logRotateStrategy != "both" {
+		t.Fatalf("expected strategy both, got %s", plan.logRotateStrategy)
+	}
+	if plan.logRotateSize != "50M" {
+		t.Fatalf("expected size 50M, got %s", plan.logRotateSize)
+	}
+	if plan.logRotateRotate != 15 {
+		t.Fatalf("expected rotate 15, got %d", plan.logRotateRotate)
+	}
+	if plan.logRotateCompress != false {
+		t.Fatalf("expected compress false, got %v", plan.logRotateCompress)
+	}
+
+	conf := plan.toNginxConf()
+	if conf.LogRotateStrategy != "both" {
+		t.Fatalf("expected conf strategy both, got %s", conf.LogRotateStrategy)
+	}
+	if conf.LogRotateCompress == nil || *conf.LogRotateCompress != false {
+		t.Fatalf("expected conf compress false")
+	}
+}
+
+func TestNginxTailServiceLogs(t *testing.T) {
+	cfg := testNginxConfig(t)
+	drv := NewNginxDriver(cfg)
+
+	logsDir := cfg.GetString("nginx.wwwlogs_root")
+	_ = os.MkdirAll(logsDir, 0o755)
+
+	// Create test access log
+	accessLogPath := filepath.Join(logsDir, "access_nginx.log")
+	logContent := "line 1\nline 2\nline 3\nline 4\nline 5\n"
+	if err := os.WriteFile(accessLogPath, []byte(logContent), 0o644); err != nil {
+		t.Fatalf("failed to write test access log: %v", err)
+	}
+
+	var buf bytes.Buffer
+	err := drv.TailServiceLogs(NginxLogOptions{
+		Type:  "access",
+		Lines: 3,
+	}, &buf)
+	if err != nil {
+		t.Fatalf("TailServiceLogs failed: %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "line 3") || !strings.Contains(out, "line 5") {
+		t.Fatalf("expected last 3 lines, got:\n%s", out)
+	}
+	if strings.Contains(out, "line 1\n") {
+		t.Fatalf("line 1 should have been truncated, got:\n%s", out)
+	}
+}
+
+
 
 
