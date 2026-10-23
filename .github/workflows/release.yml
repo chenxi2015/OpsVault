@@ -120,10 +120,10 @@ jobs:
               echo "**版本对比**: \`${PREV_TAG}...${TAG}\`"
               echo ""
               echo "### 📝 变更记录 (Changelog)"
-              git log "${PREV_TAG}..${TAG}" --pretty=format:"- %s (\`%h\` by @%an)" --no-merges || true
+              git log "${PREV_TAG}..${TAG}" --pretty=format:"- %s (\`%h\`)" --no-merges || true
             else
               echo "### 📝 初始发布记录 (Changelog)"
-              git log -n 30 --pretty=format:"- %s (\`%h\` by @%an)" --no-merges || true
+              git log -n 30 --pretty=format:"- %s (\`%h\`)" --no-merges || true
             fi
             echo ""
             echo ""
@@ -161,6 +161,5 @@ jobs:
           else
             gh release create "${TAG}" dist/* \
               --title "OpsVault ${TAG}" \
-              --notes-file release_notes.md \
-              --generate-notes
+              --notes-file release_notes.md
           fi
