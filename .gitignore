@@ -16,3 +16,4 @@ opsvault_data/logs
 configs/*.pem
 .gocache
 tmp/
+.history/

@@ -40,6 +40,9 @@ import (
 )
 
 var (
+	// Version is injected at build time via -ldflags "-X OpsVault/cmd.Version=vX.Y.Z"
+	Version = "dev"
+
 	cfgFile string
 	debug   bool
 	config  = viper.New()
@@ -57,9 +60,10 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "opsvault",
-	Short: "OpsVault 运维百宝箱",
-	Long:  "OpsVault 是一站式 CentOS 中间件与 Web 服务运维 CLI/TUI 工具集。",
+	Use:     "opsvault",
+	Version: Version,
+	Short:   "OpsVault 运维百宝箱",
+	Long:    "OpsVault 是一站式 CentOS 中间件与 Web 服务运维 CLI/TUI 工具集。",
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 		if err := initConfig(); err != nil {
 			return err
@@ -103,6 +107,8 @@ func init() {
 	}
 
 	rootCmd.AddCommand(newTUICommand())
+	rootCmd.AddCommand(newVersionCommand())
+	rootCmd.AddCommand(newUpgradeCommand(config))
 	rootCmd.AddCommand(newDoctorCommand(config, dockerFactory))
 	rootCmd.AddCommand(newInitCommand(config, dockerFactory))
 	rootCmd.AddCommand(nginx.NewCommand(config))

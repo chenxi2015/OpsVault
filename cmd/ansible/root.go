@@ -3,9 +3,9 @@ package ansiblecmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"OpsVault/internal/driver/ansible"
+	"OpsVault/pkg/fileutil"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -43,10 +43,8 @@ func NewCommand(cfg *viper.Viper) *cobra.Command {
 			ansibleCfg := viper.New()
 			ansibleCfg.SetConfigType("yaml")
 			ansibleCfg.SetConfigName(configName)
-			ansibleCfg.AddConfigPath("./configs")
-			ansibleCfg.AddConfigPath(".")
-			if home, err := os.UserHomeDir(); err == nil {
-				ansibleCfg.AddConfigPath(filepath.Join(home, ".opsvault"))
+			for _, path := range fileutil.GetConfigSearchPaths() {
+				ansibleCfg.AddConfigPath(path)
 			}
 
 			if err := ansibleCfg.ReadInConfig(); err != nil {

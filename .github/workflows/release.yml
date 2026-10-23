@@ -1,0 +1,146 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+          cache: true
+
+      - name: Determine release tag
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build cross-platform binaries and bundle configs
+        env:
+          VERSION: ${{ steps.meta.outputs.tag }}
+        run: |
+          mkdir -p dist
+
+          build_target() {
+            local goos="$1"
+            local goarch="$2"
+            local ext="$3"
+            local target_name="opsvault-${goos}-${goarch}"
+            local bin_name="opsvault${ext}"
+            local bundle_dir="dist/${target_name}"
+
+            echo "Building ${target_name} (${VERSION})..."
+            mkdir -p "${bundle_dir}/configs" "${bundle_dir}/scripts"
+
+            CGO_ENABLED=0 GOOS="${goos}" GOARCH="${goarch}" \
+              go build -trimpath -ldflags="-s -w -X OpsVault/cmd.Version=${VERSION}" \
+              -o "${bundle_dir}/${bin_name}" main.go
+
+            # Copy standalone binary for direct download / ansible push compatibility
+            cp "${bundle_dir}/${bin_name}" "dist/${target_name}${ext}"
+
+            # Copy clean default.yaml and ansible.yaml from templates so environment is decoupled
+            cp configs/default.example.yaml "${bundle_dir}/configs/default.yaml"
+            cp configs/ansible.example.yaml "${bundle_dir}/configs/ansible.yaml"
+            cp configs/default.example.yaml "${bundle_dir}/configs/default.example.yaml"
+            cp configs/ansible.example.yaml "${bundle_dir}/configs/ansible.example.yaml"
+
+            if [ -f scripts/install_docker.sh ]; then
+              cp scripts/install_docker.sh "${bundle_dir}/scripts/"
+            fi
+            cp README.md LICENSE "${bundle_dir}/"
+
+            # Package archive with binary + configs
+            if [ "${goos}" = "windows" ]; then
+              (cd dist && zip -rq "${target_name}-${VERSION}.zip" "${target_name}")
+            else
+              tar -C dist -czf "dist/${target_name}-${VERSION}.tar.gz" "${target_name}"
+            fi
+
+            rm -rf "${bundle_dir}"
+          }
+
+          build_target linux amd64 ""
+          build_target linux arm64 ""
+          build_target darwin amd64 ""
+          build_target darwin arm64 ""
+          build_target windows amd64 ".exe"
+
+          # Also export standalone config templates to release assets
+          cp configs/default.example.yaml dist/default.yaml
+          cp configs/ansible.example.yaml dist/ansible.yaml
+
+          # Generate SHA256 checksums
+          (cd dist && sha256sum * > checksums.txt)
+          ls -lh dist/
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          PREV_TAG=$(git tag -l "v*" --sort=-v:refname | grep -v "^${TAG}$" | head -n 1 || true)
+
+          NOTES_FILE="release_notes.md"
+          {
+            echo "## 🚀 OpsVault ${TAG} 更新说明"
+            echo ""
+            if [ -n "${PREV_TAG}" ]; then
+              echo "**版本对比**: \`${PREV_TAG}...${TAG}\`"
+              echo ""
+              echo "### 📝 变更记录 (Changelog)"
+              git log "${PREV_TAG}..${TAG}" --pretty=format:"- %s (\`%h\` by @%an)" --no-merges || true
+            else
+              echo "### 📝 初始发布记录 (Changelog)"
+              git log -n 30 --pretty=format:"- %s (\`%h\` by @%an)" --no-merges || true
+            fi
+            echo ""
+            echo ""
+            echo "### 📦 产物说明 (Assets)"
+            echo "- **完整发行包（推荐）**: \`opsvault-<os>-<arch>-${TAG}.tar.gz\` / \`.zip\`（内置可执行文件及干净的 \`configs/default.yaml\` 与 \`configs/ansible.yaml\` 配置文件，解压即用，不绑定特定环境）"
+            echo "- **独立可执行文件**: \`opsvault-<os>-<arch>\`（适合直接替换升级或用于 \`opsvault ansible push\` 边缘节点下发）"
+            echo "- **独立默认配置**: \`default.yaml\` / \`ansible.yaml\`"
+            echo "- **校验文件**: \`checksums.txt\` (SHA256)"
+          } > "${NOTES_FILE}"
+
+          cat "${NOTES_FILE}"
+
+      - name: Publish Release via GitHub CLI (gh)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists, uploading assets and updating notes..."
+            gh release upload "${TAG}" dist/* --clobber
+            gh release edit "${TAG}" --title "OpsVault ${TAG}" --notes-file release_notes.md
+          else
+            gh release create "${TAG}" dist/* \
+              --title "OpsVault ${TAG}" \
+              --notes-file release_notes.md \
+              --generate-notes
+          fi
