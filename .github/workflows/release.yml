@@ -61,8 +61,9 @@ jobs:
               go build -trimpath -ldflags="-s -w -X OpsVault/cmd.Version=${VERSION}" \
               -o "${bundle_dir}/${bin_name}" main.go
 
-            # Copy standalone binary for direct download / ansible push compatibility
-            cp "${bundle_dir}/${bin_name}" "dist/${target_name}${ext}"
+            # Temporarily save standalone binary for direct download / ansible push compatibility
+            local tmp_bin="${RUNNER_TEMP:-/tmp}/opsvault_${target_name}${ext}"
+            cp "${bundle_dir}/${bin_name}" "${tmp_bin}"
 
             # Copy clean default.yaml and ansible.yaml from templates so environment is decoupled
             cp configs/default.example.yaml "${bundle_dir}/configs/default.yaml"
@@ -86,6 +87,8 @@ jobs:
             fi
 
             rm -rf "${bundle_dir}"
+            mv "${tmp_bin}" "dist/${target_name}${ext}"
+            chmod +x "dist/${target_name}${ext}"
           }
 
           build_target linux amd64 ""
