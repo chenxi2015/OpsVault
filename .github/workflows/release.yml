@@ -73,6 +73,9 @@ jobs:
             if [ -f scripts/install_docker.sh ]; then
               cp scripts/install_docker.sh "${bundle_dir}/scripts/"
             fi
+            if [ -f scripts/install.sh ]; then
+              cp scripts/install.sh "${bundle_dir}/scripts/"
+            fi
             cp README.md LICENSE "${bundle_dir}/"
 
             # Package archive with binary + configs
@@ -91,9 +94,10 @@ jobs:
           build_target darwin arm64 ""
           build_target windows amd64 ".exe"
 
-          # Also export standalone config templates to release assets
+          # Also export standalone config templates and one-click installer to release assets
           cp configs/default.example.yaml dist/default.yaml
           cp configs/ansible.example.yaml dist/ansible.yaml
+          cp scripts/install.sh dist/install.sh
 
           # Generate SHA256 checksums
           (cd dist && sha256sum * > checksums.txt)
@@ -120,7 +124,20 @@ jobs:
             fi
             echo ""
             echo ""
+            echo "### ⚡ 一键安装与升级 (Quick Install)"
+            echo "\`\`\`bash"
+            echo "# Linux / macOS 一键安装（自动识别架构、内置国内镜像加速与配置初始化）"
+            echo "curl -fsSL https://raw.githubusercontent.com/chenxi2015/opsvault/main/scripts/install.sh | bash"
+            echo ""
+            echo "# 国内加速备选"
+            echo "curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/chenxi2015/opsvault/main/scripts/install.sh | bash"
+            echo ""
+            echo "# 已安装用户直接原地升级"
+            echo "opsvault upgrade"
+            echo "\`\`\`"
+            echo ""
             echo "### 📦 产物说明 (Assets)"
+            echo "- **一键安装脚本**: \`install.sh\`"
             echo "- **完整发行包（推荐）**: \`opsvault-<os>-<arch>-${TAG}.tar.gz\` / \`.zip\`（内置可执行文件及干净的 \`configs/default.yaml\` 与 \`configs/ansible.yaml\` 配置文件，解压即用，不绑定特定环境）"
             echo "- **独立可执行文件**: \`opsvault-<os>-<arch>\`（适合直接替换升级或用于 \`opsvault ansible push\` 边缘节点下发）"
             echo "- **独立默认配置**: \`default.yaml\` / \`ansible.yaml\`"

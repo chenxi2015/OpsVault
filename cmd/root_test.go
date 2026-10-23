@@ -76,20 +76,20 @@ nginx:
 }
 
 func TestDefaultYamlPathsDerivation(t *testing.T) {
-	cfgFile = filepath.Join("..", "configs", "default.yaml")
+	cfgFile = filepath.Join("..", "configs", "default.example.yaml")
 	t.Cleanup(func() {
 		cfgFile = ""
 		resetConfigForTest()
 	})
 
 	if err := initConfig(); err != nil {
-		t.Fatalf("initConfig on default.yaml: %v", err)
+		t.Fatalf("initConfig on default.example.yaml: %v", err)
 	}
 
 	appCfg := AppConfig()
 	rootDir := appCfg.GetString("system.root_dir")
-	if rootDir != "/www/opsvault" {
-		t.Errorf("expected system.root_dir from default.yaml to be '/www/opsvault', got %q", rootDir)
+	if rootDir != "/data/opsvault" {
+		t.Errorf("expected system.root_dir from default.example.yaml to be '/data/opsvault', got %q", rootDir)
 	}
 	if got := appCfg.GetString("docker.data_root"); got != rootDir {
 		t.Errorf("expected docker.data_root to inherit system.root_dir %q, got %q", rootDir, got)

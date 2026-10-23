@@ -20,7 +20,9 @@ OpsVault 是一个面向 CentOS 7 / CentOS Stream 的运维工具箱，提供：
 
 - 完整命令树：
   - `opsvault tui` (全功能终端交互控制台)
-  - `opsvault init` (一键初始化与服务选择安装)
+  - `opsvault init` (一键导出默认配置文件与交互式服务选择安装)
+  - `opsvault upgrade` (在线检测新版本与原地原子自升级)
+  - `opsvault version` (查看当前版本、平台架构与 Go 运行时信息)
   - `opsvault doctor` (系统与运行环境体检诊断)
   - `opsvault nginx ...` (Nginx 二进制编译与 vhost/SSL 管理)
   - `opsvault mysql ...` (MySQL 关系型数据库)
@@ -44,24 +46,72 @@ OpsVault 是一个面向 CentOS 7 / CentOS Stream 的运维工具箱，提供：
   - `opsvault bak ...` (配置备份与恢复)
   - `opsvault migrate ...` (服务跨主机迁移与引擎转换)
   - `opsvault ansible ...` (多机批量连接、巡检、自动化部署、二进制分发与服务回收)
-- 全局配置加载与默认配置模板
+- 全局配置加载与内嵌默认配置模板（`//go:embed` 单二进制自包含）
 - `driver.ServiceDriver` 统一接口与 `ServiceStatus` 状态结构
 - Docker 网络/基础驱动封装（专属 `opsvault-net` 网桥）
 - Nginx 源码下载、编译安装、systemd 与基础配置生成
 - 丰富交互的 BubbleTea TUI 页面
 - 自动化单测与全平台 Makefile 交叉编译构建支持
 
-## 配置文件
+## 快速安装与自升级
 
-默认配置文件位于：
+### 1. 一键脚本安装 (Linux / macOS)
 
-- [configs/default.yaml](./configs/default.yaml)
-
-可通过以下方式指定自定义配置：
+安装脚本会自动识别操作系统（`Linux` / `Darwin`）与 CPU 架构（`amd64` / `arm64`），内置国内 GitHub 镜像加速节点轮询与 SHA256 完整性校验，并在安装后自动调用 `opsvault init --config-only` 初始化生成全量带注释的 YAML 配置文件：
 
 ```bash
-opsvault --config /path/to/config.yaml mysql status
+# 标准一键安装（自动获取最新 Release 版本）
+curl -fsSL https://raw.githubusercontent.com/chenxi2015/opsvault/main/scripts/install.sh | bash
+
+# 国内服务器镜像加速一键安装（推荐国内网络使用）
+curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/chenxi2015/opsvault/main/scripts/install.sh | bash
+
+# 指定版本或自定义安装目录
+curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/chenxi2015/opsvault/main/scripts/install.sh | bash -s -- --version v0.1.0 --install-dir /data/opsvault
 ```
+
+- **Linux (root)** 默认安装至 `/data/opsvault`（二进制位于 `/data/opsvault/bin/opsvault`，配置文件位于 `/data/opsvault/configs/default.yaml`，并自动软链至 `/usr/local/bin/opsvault`）。
+- **macOS / 普通用户** 默认安装至 `~/.opsvault`（配置文件位于 `~/.opsvault/configs/default.yaml`）。
+
+### 2. 在线版本检测与一键自升级 (`opsvault upgrade`)
+
+已安装 `opsvault` 的机器无需重新运行脚本，可直接通过内置自更新命令完成升级或版本回滚：
+
+```bash
+# 查看当前版本与运行平台
+opsvault version
+
+# 仅检查是否有新版本发布（输出 Release Notes，不替换二进制）
+opsvault upgrade --check
+
+# 一键升级至最新稳定版（内置国内镜像加速与 SHA256 校验，保留全部已有 YAML 配置）
+opsvault upgrade
+
+# 升级或回滚至指定版本 Tag
+opsvault upgrade --tag v0.1.0
+```
+
+## 配置文件与初始化 (`opsvault init`)
+
+OpsVault 二进制文件内部已通过 Go `embed` 内嵌完整的 `default.yaml` 与 `ansible.yaml` 配置模板。即使仅下载了单个二进制文件，也可以随时一键导出完整带注释的配置文件：
+
+```bash
+# 仅初始化生成 default.yaml 与 ansible.yaml 配置文件（默认已存在时不覆盖，保护用户配置）
+opsvault init --config-only
+
+# 指定输出目录或强制重置为默认配置模板（--force / -f）
+opsvault init --config-only --config-dir /data/opsvault/configs --force
+
+# 启动交互式 TUI 向导勾选并安装中间件（若本地尚无配置文件会自动先释放默认 YAML）
+opsvault init
+```
+
+配置文件默认搜索路径优先级：
+
+1. 显式指定：`opsvault --config /path/to/config.yaml ...`
+2. 当前工作目录：`./configs/default.yaml`、`./default.yaml`
+3. 可执行文件同级或上级配置目录：`<install_dir>/configs/default.yaml`
+4. 用户与系统全局目录：`~/.opsvault/configs/default.yaml`、`/data/opsvault/configs/default.yaml`、`/etc/opsvault/default.yaml`
 
 ### 自动生成随机密码说明
 

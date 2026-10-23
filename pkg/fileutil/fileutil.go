@@ -42,25 +42,51 @@ func GetConfigSearchPaths() []string {
 	}
 
 	if home, err := os.UserHomeDir(); err == nil {
-		paths = append(paths, filepath.Join(home, ".opsvault"))
+		paths = append(paths, filepath.Join(home, ".opsvault", "configs"), filepath.Join(home, ".opsvault"))
 	}
+
+	paths = append(paths, "/data/opsvault/configs", "/etc/opsvault")
 
 	return paths
 }
 
-// GetDefaultWriteConfigPath returns the default target path for writing config files.
-func GetDefaultWriteConfigPath() string {
+// GetDefaultConfigDir returns the default directory for reading/writing OpsVault config files.
+func GetDefaultConfigDir() string {
 	if exePath, err := os.Executable(); err == nil {
 		if realPath, errSym := filepath.EvalSymlinks(exePath); errSym == nil {
 			exePath = realPath
 		}
 		exeDir := filepath.Dir(exePath)
-		if filepath.Base(exeDir) == "bin" {
-			return filepath.Join(filepath.Dir(exeDir), "configs", "default.yaml")
+		if !isSystemBinDir(exeDir) {
+			if filepath.Base(exeDir) == "bin" {
+				return filepath.Join(filepath.Dir(exeDir), "configs")
+			}
+			return filepath.Join(exeDir, "configs")
 		}
-		return filepath.Join(exeDir, "configs", "default.yaml")
 	}
-	return filepath.Join("configs", "default.yaml")
+
+	if info, err := os.Stat("configs"); err == nil && info.IsDir() {
+		return "configs"
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		return filepath.Join(home, ".opsvault", "configs")
+	}
+	return "configs"
+}
+
+func isSystemBinDir(dir string) bool {
+	clean := filepath.Clean(dir)
+	switch clean {
+	case "/bin", "/sbin", "/usr/bin", "/usr/sbin", "/usr/local/bin", "/usr/local/sbin", "/opt/homebrew/bin":
+		return true
+	default:
+		return false
+	}
+}
+
+// GetDefaultWriteConfigPath returns the default target path for writing config files.
+func GetDefaultWriteConfigPath() string {
+	return filepath.Join(GetDefaultConfigDir(), "default.yaml")
 }
 
 // UpdateYAMLValue updates a specific key's value under a specific service section in a YAML file,

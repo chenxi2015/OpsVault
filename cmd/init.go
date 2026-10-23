@@ -2,11 +2,14 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
+	"OpsVault/configs"
 	"OpsVault/internal/driver"
 	"OpsVault/internal/tui"
 	"OpsVault/pkg/credutil"
+	"OpsVault/pkg/fileutil"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -168,18 +171,64 @@ func (m *initModel) View() string {
 	return "\n" + borderBox + "\n"
 }
 
+func resolveInitConfigDir(explicitDir string) string {
+	if explicitDir != "" {
+		return explicitDir
+	}
+	if cfgFile != "" {
+		return filepath.Dir(cfgFile)
+	}
+	return fileutil.GetDefaultConfigDir()
+}
+
+func runConfigInit(cmd *cobra.Command, targetDir string, overwrite bool, quietIfSkipped bool) error {
+	results, err := configs.WriteTemplates(targetDir, overwrite)
+	if err != nil {
+		return err
+	}
+
+	for _, res := range results {
+		if res.Created {
+			cmd.Printf("%s %s\n", successStyle.Render("✓ Generated config file:"), res.Path)
+		} else if res.Skipped && !quietIfSkipped {
+			cmd.Printf("%s %s (use --force to overwrite)\n", infoStyle.Render("• Config already exists, skipped:"), res.Path)
+		}
+	}
+	return nil
+}
+
 func newInitCommand(cfg *viper.Viper, dockerFactory func() (*client.Client, error)) *cobra.Command {
 	var (
 		serviceNames string
 		allServices  bool
 		purge        bool
 		force        bool
+		configOnly   bool
+		configDir    string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Initialize and install selected services",
+		Short: "Initialize configuration files and install selected services",
+		Example: `  # Interactive service selection and initialization
+  opsvault init
+
+  # Only generate default.yaml and ansible.yaml configuration files
+  opsvault init --config-only
+
+  # Generate configuration files into a custom directory (overwrite existing)
+  opsvault init --config-only --config-dir /data/opsvault/configs --force`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			targetConfigDir := resolveInitConfigDir(configDir)
+			if configOnly {
+				return runConfigInit(cmd, targetConfigDir, force, false)
+			}
+
+			// Ensure default configuration files exist on disk before initializing services
+			if cfg == nil || cfg.ConfigFileUsed() == "" {
+				_ = runConfigInit(cmd, targetConfigDir, false, true)
+			}
+
 			provider := tui.NewRuntimeStatusProvider(cfg, dockerFactory)
 			services := provider.Services()
 
@@ -282,7 +331,9 @@ func newInitCommand(cfg *viper.Viper, dockerFactory func() (*client.Client, erro
 	cmd.Flags().StringVar(&serviceNames, "services", "", "Comma-separated list of services to initialize (e.g. nginx,mysql)")
 	cmd.Flags().BoolVar(&allServices, "all", false, "Initialize all services")
 	cmd.Flags().BoolVar(&purge, "purge", false, "Purge existing configurations/data before installation")
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force installation and overwrite existing services without prompt")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force installation and overwrite existing services/configs without prompt")
+	cmd.Flags().BoolVarP(&configOnly, "config-only", "c", false, "Only generate default.yaml and ansible.yaml configuration files without installing services")
+	cmd.Flags().StringVar(&configDir, "config-dir", "", "Target directory to write configuration files when initializing")
 
 	return cmd
 }
