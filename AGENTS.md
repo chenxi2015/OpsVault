@@ -253,6 +253,7 @@ opsvault minio log
 # 基础连接、连通性与执行
 opsvault ansible ping --group db_servers [-e test|prod]
 opsvault ansible exec --cmd "uptime" --group db_servers [-e test|prod]
+opsvault ansible exec -f ./scripts/init.sh --group db_servers [-e test|prod]
 opsvault ansible doctor --group db_servers [-e test|prod]
 opsvault ansible list [-e test|prod]
 
@@ -325,7 +326,7 @@ opsvault ansible push --group db_servers --bin ./bin/opsvault-linux-amd64 --conf
 *   支持完整的生命周期管理、镜像升级以及带 `--purge` 清除宿主机数据目录的卸载。
 
 ## 4.8 Ansible 批量驱动与边缘协同模块 (`internal/driver/ansible`)
-*   **多机连通性与执行**：支持并发 SSH Ping 与 ad-hoc 执行，自动从 CLI 提取当前激活的 Cobra 参数并与 Viper 配置合并。
+*   **多机连通性与执行**：支持并发 SSH Ping 与 ad-hoc 执行，自动从 CLI 提取当前激活的 Cobra 参数并与 Viper 配置合并。`ansible exec` 支持通过 `--cmd` 执行 ad-hoc 单行命令或通过 `-f/--file` 批量下发执行本地 shell 脚本，内置针对命令与脚本内容的完整安全审查（Safe / Mutating / Dangerous）与审计日志。
 *   **多机健康诊断 (doctor)**：获取并解析集群多主机 CPU、内存、根分区磁盘及 `docker`/`nginx` 服务运行状态，通过 `lipgloss` 渲染终端表格。
 *   **安全凭据生成与下发**：当 `ansible deploy` 部署 MySQL / Redis / RabbitMQ 时若未设定凭据，系统由 `credutil.GenPassword(20)` 自动生成 20 位高强度强密码，嵌入 Playbook 批量渲染下发，并在终端展示高亮卡片。
 *   **边缘协同推送 (push)**：推送到目标节点 `/data/opsvault/bin` 和 `/configs` 中并生成 `/usr/local/bin/opsvault` 全局链接，赋予每个节点本地就地运行 `opsvault tui` 的独立运维能力。
